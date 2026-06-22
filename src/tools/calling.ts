@@ -12,6 +12,8 @@
  *   2. Send via WhatsApp Business API
  *   3. Return session_id so the LLM can poll present_bid_results later
  *      (replies arrive asynchronously via webhook)
+ *
+ * Currency: SGD primary (Singapore market). RM/MYR accepted from MY contractors.
  */
 
 import { z } from "zod";
@@ -24,11 +26,11 @@ import { execute, queryOne } from "../db/database.js";
 export const whatsappHandymanSchema = z.object({
   handyman_id: z.string().describe("Handyman ID from the database"),
   handyman_name: z.string().describe("Handyman's name"),
-  handyman_phone: z.string().describe("Handyman's WhatsApp number in E.164 format (e.g. +60123456789)"),
+  handyman_phone: z.string().describe("Handyman's WhatsApp number in E.164 format (e.g. +6591234567)"),
   service_type: z.string().describe("Type of service needed (e.g. plumbing, electrical)"),
   address: z.string().optional().describe("Job location address"),
   datetime: z.string().optional().describe("Preferred datetime (e.g. Saturday 10am)"),
-  max_budget: z.number().optional().describe("Customer's maximum budget in local currency"),
+  max_budget: z.number().optional().describe("Customer's maximum budget in SGD"),
   session_id: z.string().optional().describe("Existing session ID to group quotes; auto-generated if not provided"),
 });
 
@@ -47,7 +49,7 @@ export const whatsappMultipleHandymenSchema = z.object({
   service_type: z.string().describe("Type of service needed"),
   address: z.string().optional().describe("Job location address"),
   datetime: z.string().optional().describe("Preferred datetime"),
-  max_budget: z.number().optional().describe("Customer's maximum budget"),
+  max_budget: z.number().optional().describe("Customer's maximum budget in SGD"),
 });
 
 // ─── Message Builder ──────────────────────────────────────────────────────────
@@ -63,7 +65,7 @@ function buildOutreachMessage(params: {
   const lines: string[] = [
     `Hi ${params.handymanName} 👋`,
     ``,
-    `I have a customer looking for *${service}* services.`,
+    `I have a customer in Singapore looking for *${service}* services.`,
   ];
 
   if (params.datetime) {
@@ -73,13 +75,13 @@ function buildOutreachMessage(params: {
     lines.push(`📍 Location: ${params.address}`);
   }
   if (params.maxBudget) {
-    lines.push(`💰 Budget: up to *${params.maxBudget}*`);
+    lines.push(`💰 Budget: up to *SGD ${params.maxBudget}*`);
   }
 
   lines.push(
     ``,
     `Are you available? If yes, please reply with:`,
-    `1. Your *price quote*`,
+    `1. Your *price quote* (SGD)`,
     `2. Your *available datetime*`,
     ``,
     `Reply *NO* if unavailable. Thank you! 🙏`
