@@ -1,247 +1,191 @@
 /**
  * calling.ts
- * Tool 7: call_handyman_proxy
- * Tool 8: call_multiple_handymen_parallel
+ * WhatsApp-native contractor outreach for Tukang.
  *
- * The "Introvert Mode" — Vapi calls handymen ON THE USER'S BEHALF.
- * User makes ZERO phone calls.
+ * Replaces Vapi voice calls entirely. Sends structured WhatsApp messages to
+ * contractors asking for availability, price, and datetime. Replies are
+ * captured automatically by the inbound WhatsApp webhook in index.ts and
+ * stored in the handyman_quotes table.
+ *
+ * Flow:
+ *   1. Build a WhatsApp message for the contractor
+ *   2. Send via WhatsApp Business API
+ *   3. Return session_id so the LLM can poll present_bid_results later
+ *      (replies arrive asynchronously via webhook)
  */
 
 import { z } from "zod";
-import { makeVapiCall, VapiCallResult } from "../lib/vapi.js";
-import { queryOne, queryAll, execute } from "../db/database.js";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
+import { sendWhatsAppMessage } from "../lib/whatsapp.js";
+import { execute, queryOne } from "../db/database.js";
 
-const SERVICE_TYPES = ["ac_repair", "plumbing", "electrical", "cleaning", "carpentry", "painting"] as const;
+// ─── Schemas ──────────────────────────────────────────────────────────────────
 
-interface HandymanRow {
-  id: string;
-  name: string;
-  phone: string;
-  whatsapp: string | null;
-  service_types: string;
-  location: string;
-  rating: number;
-  bookings: number;
-  trust_score: number;
-  price_min: number;
-  price_max: number;
-}
-
-// ─── Tool 7: call_handyman_proxy ──────────────────────────────────────────────
-
-export const callHandymanProxySchema = z.object({
-  handyman_id: z.string().describe("Handyman ID from search results."),
-  handyman_phone: z.string().optional().describe("Handyman phone number. Auto-looked up if omitted."),
-  purpose: z
-    .enum(["inquiry", "booking", "price_quote"])
-    .describe("Purpose of the call."),
-  service_type: z.enum(SERVICE_TYPES).describe("Service type needed."),
-  datetime: z.string().optional().describe("Preferred datetime (e.g. 'Saturday 10AM')."),
-  address: z.string().optional().describe("Service address."),
-  max_budget: z.number().optional().describe("Maximum budget in SGD."),
+export const whatsappHandymanSchema = z.object({
+  handyman_id: z.string().describe("Handyman ID from the database"),
+  handyman_name: z.string().describe("Handyman's name"),
+  handyman_phone: z.string().describe("Handyman's WhatsApp number in E.164 format (e.g. +60123456789)"),
+  service_type: z.string().describe("Type of service needed (e.g. plumbing, electrical)"),
+  address: z.string().optional().describe("Job location address"),
+  datetime: z.string().optional().describe("Preferred datetime (e.g. Saturday 10am)"),
+  max_budget: z.number().optional().describe("Customer's maximum budget in local currency"),
+  session_id: z.string().optional().describe("Existing session ID to group quotes; auto-generated if not provided"),
 });
 
-export type CallHandymanProxyInput = z.infer<typeof callHandymanProxySchema>;
-
-export async function callHandymanProxy(
-  input: CallHandymanProxyInput
-): Promise<string> {
-  // Look up handyman
-  const handyman = queryOne<HandymanRow>(
-    "SELECT * FROM handymen WHERE id = ?",
-    [input.handyman_id]
-  );
-
-  if (!handyman) {
-    return JSON.stringify({ error: `Handyman ${input.handyman_id} not found.` });
-  }
-
-  const phone = input.handyman_phone ?? handyman.phone;
-
-  // Make the Vapi call
-  const result: VapiCallResult = await makeVapiCall({
-    handymanId: handyman.id,
-    handymanName: handyman.name,
-    handymanPhone: phone,
-    purpose: input.purpose,
-    serviceType: input.service_type,
-    datetime: input.datetime,
-    address: input.address,
-    maxBudget: input.max_budget,
-  });
-
-  // Persist call result
-  const callResultId = uuidv4();
-  execute(
-    `INSERT INTO call_results (id, handyman_id, call_status, transcription, availability, price_quoted, datetime_offered, call_duration, vapi_call_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      callResultId,
-      handyman.id,
-      result.callStatus,
-      result.transcription,
-      result.availability ? 1 : 0,
-      result.priceQuoted ?? null,
-      result.datetimeOffered ?? null,
-      result.callDuration,
-      result.callId,
-    ]
-  );
-
-  return JSON.stringify({
-    call_result_id: callResultId,
-    handyman: {
-      id: handyman.id,
-      name: handyman.name,
-      rating: handyman.rating,
-    },
-    call_status: result.callStatus,
-    transcription: result.transcription,
-    availability: result.availability,
-    price_quoted: result.priceQuoted,
-    datetime_offered: result.datetimeOffered,
-    call_duration_seconds: result.callDuration,
-    user_made_zero_calls: true,
-    next_step: result.availability
-      ? `${handyman.name} is available at $${result.priceQuoted}. Use accept_winning_bid to book.`
-      : `${handyman.name} is not available. Try another handyman or use call_multiple_handymen_parallel.`,
-  });
-}
-
-// ─── Tool 8: call_multiple_handymen_parallel ──────────────────────────────────
-
-export const callMultipleHandymenParallelSchema = z.object({
-  service_type: z.enum(SERVICE_TYPES).describe("Service type needed."),
-  location: z.string().optional().describe("Preferred location/area."),
-  purpose: z
-    .enum(["inquiry", "booking", "price_quote"])
-    .default("price_quote")
-    .describe("Purpose of the calls."),
-  datetime: z.string().optional().describe("Preferred datetime."),
-  address: z.string().optional().describe("Service address."),
-  max_budget: z.number().optional().describe("Maximum budget in SGD."),
-  max_handymen: z
-    .number()
+export const whatsappMultipleHandymenSchema = z.object({
+  handymen: z
+    .array(
+      z.object({
+        handyman_id: z.string(),
+        handyman_name: z.string(),
+        handyman_phone: z.string(),
+      })
+    )
     .min(1)
-    .max(10)
-    .default(5)
-    .describe("Maximum number of handymen to call (default 5)."),
+    .max(5)
+    .describe("List of 1-5 handymen to contact simultaneously"),
+  service_type: z.string().describe("Type of service needed"),
+  address: z.string().optional().describe("Job location address"),
+  datetime: z.string().optional().describe("Preferred datetime"),
+  max_budget: z.number().optional().describe("Customer's maximum budget"),
 });
 
-export type CallMultipleHandymenParallelInput = z.infer<
-  typeof callMultipleHandymenParallelSchema
->;
+// ─── Message Builder ──────────────────────────────────────────────────────────
 
-export async function callMultipleHandymenParallel(
-  input: CallMultipleHandymenParallelInput
-): Promise<string> {
-  const startTime = Date.now();
+function buildOutreachMessage(params: {
+  handymanName: string;
+  serviceType: string;
+  address?: string;
+  datetime?: string;
+  maxBudget?: number;
+}): string {
+  const service = params.serviceType.replace(/_/g, " ");
+  const lines: string[] = [
+    `Hi ${params.handymanName} 👋`,
+    ``,
+    `I have a customer looking for *${service}* services.`,
+  ];
 
-  // Find top handymen for this service
-  const allHandymen = queryAll<HandymanRow>(
-    "SELECT * FROM handymen WHERE available = 1 ORDER BY trust_score DESC"
-  );
-
-  const relevant = allHandymen
-    .filter((h) => {
-      const services: string[] = JSON.parse(h.service_types);
-      return services.includes(input.service_type);
-    })
-    .filter((h) => {
-      if (!input.max_budget) return true;
-      return h.price_min <= input.max_budget;
-    })
-    .slice(0, input.max_handymen);
-
-  if (relevant.length === 0) {
-    return JSON.stringify({
-      error: `No available handymen found for ${input.service_type}.`,
-    });
+  if (params.datetime) {
+    lines.push(`📅 Preferred time: *${params.datetime}*`);
+  }
+  if (params.address) {
+    lines.push(`📍 Location: ${params.address}`);
+  }
+  if (params.maxBudget) {
+    lines.push(`💰 Budget: up to *${params.maxBudget}*`);
   }
 
-  // Call all handymen in parallel (Promise.all — Introvert Mode)
-  const callPromises = relevant.map((h) =>
-    makeVapiCall({
-      handymanId: h.id,
-      handymanName: h.name,
-      handymanPhone: h.phone,
-      purpose: input.purpose,
-      serviceType: input.service_type,
-      datetime: input.datetime,
-      address: input.address,
-      maxBudget: input.max_budget,
-    }).then((result) => ({ handyman: h, result }))
+  lines.push(
+    ``,
+    `Are you available? If yes, please reply with:`,
+    `1. Your *price quote*`,
+    `2. Your *available datetime*`,
+    ``,
+    `Reply *NO* if unavailable. Thank you! 🙏`
   );
 
-  const callOutcomes = await Promise.all(callPromises);
-  const totalTime = Math.round((Date.now() - startTime) / 1000);
+  return lines.join("\n");
+}
 
-  // Persist all call results
-  for (const { handyman, result } of callOutcomes) {
+// ─── Single Handyman Outreach ─────────────────────────────────────────────────
+
+export async function whatsappHandyman(
+  args: z.infer<typeof whatsappHandymanSchema>
+): Promise<string> {
+  const sessionId = args.session_id ?? randomUUID();
+  const message = buildOutreachMessage({
+    handymanName: args.handyman_name,
+    serviceType: args.service_type,
+    address: args.address,
+    datetime: args.datetime,
+    maxBudget: args.max_budget,
+  });
+
+  let sendStatus = "sent";
+  try {
+    await sendWhatsAppMessage(args.handyman_phone, message);
+  } catch (err) {
+    console.error(`[WhatsApp Outreach] Failed to message ${args.handyman_name}:`, err);
+    sendStatus = "failed";
+  }
+
+  // Pre-insert a pending quote row so present_bid_results can show "waiting"
+  const existing = queryOne(
+    "SELECT id FROM handyman_quotes WHERE session_id = ? AND handyman_id = ?",
+    [sessionId, args.handyman_id]
+  );
+  if (!existing) {
     execute(
-      `INSERT INTO call_results (id, handyman_id, call_status, transcription, availability, price_quoted, datetime_offered, call_duration, vapi_call_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        uuidv4(),
-        handyman.id,
-        result.callStatus,
-        result.transcription,
-        result.availability ? 1 : 0,
-        result.priceQuoted ?? null,
-        result.datetimeOffered ?? null,
-        result.callDuration,
-        result.callId,
-      ]
+      `INSERT INTO handyman_quotes
+       (id, session_id, handyman_id, handyman_phone, raw_message, price_quoted, available, datetime_offered, wa_msg_id)
+       VALUES (?, ?, ?, ?, ?, NULL, 0, NULL, NULL)`,
+      [randomUUID(), sessionId, args.handyman_id, args.handyman_phone,
+       sendStatus === "sent" ? "[PENDING — awaiting reply]" : "[SEND FAILED]"]
     );
   }
 
-  // Filter available + sort cheapest first
-  const available = callOutcomes
-    .filter(({ result }) => result.availability && result.priceQuoted !== null)
-    .sort((a, b) => (a.result.priceQuoted ?? 999) - (b.result.priceQuoted ?? 999));
+  return JSON.stringify({
+    status: sendStatus,
+    session_id: sessionId,
+    handyman_id: args.handyman_id,
+    handyman_name: args.handyman_name,
+    message_sent: message,
+    note: sendStatus === "sent"
+      ? "WhatsApp sent. Contractor reply will arrive via webhook and be stored automatically. Use present_bid_results with this session_id to check responses."
+      : "WhatsApp send failed. Check WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID.",
+  }, null, 2);
+}
 
-  const toCall = relevant.map((h) => ({ id: h.id, name: h.name, phone: h.phone }));
+// ─── Parallel Multi-Handyman Outreach ─────────────────────────────────────────
 
-  const responses = callOutcomes.map(({ handyman, result }) => ({
-    handyman_id: handyman.id,
-    name: handyman.name,
-    call_status: result.callStatus,
-    availability: result.availability,
-    price_quoted: result.priceQuoted,
-    datetime_offered: result.datetimeOffered,
-    call_duration_seconds: result.callDuration,
-    transcription_snippet: result.transcription.slice(0, 120),
-  }));
+export async function whatsappMultipleHandymen(
+  args: z.infer<typeof whatsappMultipleHandymenSchema>
+): Promise<string> {
+  const sessionId = randomUUID();
 
-  const availableHandymen = available.map(({ handyman, result }, index) => ({
-    rank: index + 1,
-    handyman_id: handyman.id,
-    name: handyman.name,
-    price: result.priceQuoted,
-    datetime: result.datetimeOffered,
-    rating: handyman.rating,
-    trust_score: handyman.trust_score,
-    response_time_seconds: result.callDuration,
-    whatsapp: handyman.whatsapp,
-    is_cheapest: index === 0,
-  }));
+  const results = await Promise.allSettled(
+    args.handymen.map(async (h) => {
+      const message = buildOutreachMessage({
+        handymanName: h.handyman_name,
+        serviceType: args.service_type,
+        address: args.address,
+        datetime: args.datetime,
+        maxBudget: args.max_budget,
+      });
+
+      let sendStatus = "sent";
+      try {
+        await sendWhatsAppMessage(h.handyman_phone, message);
+      } catch (err) {
+        console.error(`[WhatsApp Outreach] Failed to message ${h.handyman_name}:`, err);
+        sendStatus = "failed";
+      }
+
+      // Pre-insert pending row
+      execute(
+        `INSERT OR IGNORE INTO handyman_quotes
+         (id, session_id, handyman_id, handyman_phone, raw_message, price_quoted, available, datetime_offered, wa_msg_id)
+         VALUES (?, ?, ?, ?, ?, NULL, 0, NULL, NULL)`,
+        [randomUUID(), sessionId, h.handyman_id, h.handyman_phone,
+         sendStatus === "sent" ? "[PENDING — awaiting reply]" : "[SEND FAILED]"]
+      );
+
+      return { handyman_id: h.handyman_id, handyman_name: h.handyman_name, status: sendStatus };
+    })
+  );
+
+  const summary = results.map((r) =>
+    r.status === "fulfilled" ? r.value : { handyman_name: "unknown", status: "failed" }
+  );
+
+  const sentCount = summary.filter((r) => r.status === "sent").length;
 
   return JSON.stringify({
-    summary: {
-      total_called: relevant.length,
-      names_called: relevant.map((h) => h.name),
-      total_time_seconds: totalTime,
-      parallel_calls: true,
-      user_made_zero_calls: true,
-    },
-    responsive_and_available: available.length,
-    toCall,
-    responses,
-    availableHandymen,
-    next_step:
-      available.length > 0
-        ? `Use present_bid_results to see formatted comparison, then accept_winning_bid to book the cheapest.`
-        : "No handymen available. Try a different time or increase budget.",
-  });
+    session_id: sessionId,
+    messages_sent: sentCount,
+    total: args.handymen.length,
+    results: summary,
+    note: `WhatsApp messages sent to ${sentCount}/${args.handymen.length} contractors simultaneously. Replies will arrive via webhook. Use present_bid_results with session_id "${sessionId}" to see responses as they come in.`,
+  }, null, 2);
 }

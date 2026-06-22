@@ -1,13 +1,5 @@
 import "dotenv/config";
 
-function required(key: string): string {
-  const val = process.env[key];
-  if (!val) {
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-  return val;
-}
-
 function optional(key: string, fallback = ""): string {
   return process.env[key] ?? fallback;
 }
@@ -20,12 +12,6 @@ export const config = {
   mem0: {
     apiKey: optional("MEM0_API_KEY"),
     baseUrl: "https://api.mem0.ai/v1",
-  },
-
-  vapi: {
-    apiKey: optional("VAPI_API_KEY"),
-    phoneNumberId: optional("VAPI_PHONE_NUMBER_ID"),
-    baseUrl: "https://api.vapi.ai",
   },
 
   whatsapp: {
