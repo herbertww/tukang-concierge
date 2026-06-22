@@ -1,0 +1,117 @@
+Build a complete MCP (Model Context Protocol) server for handyman booking called "Tukang" with the following requirements:
+
+## PROJECT OVERVIEW
+Create a chat-native handyman booking tool accessible right inside Claude or any MCP-compliant model. The USP is:
+1. **Zero context switching** — everything happens in chat
+2. **Introvert mode** — Vapi calls handymen ON YOUR BEHALF, you make ZERO phone calls
+3. **Bid comparison** — Vapi gets quotes from 3-5 handymen parallel, user picks cheapest
+4. **WhatsApp acceptance** — winning handyman accepts via WhatsApp, user gets instant notification
+5. **Stripe service fee** — user pays base fee ($5) via Stripe for contacting service (separate from handyman's rate paid upon completion)
+6. **LLM token payment** — user pays with their own chat LLM tokens for the search
+
+## CORE ARCHITECTURE
+- Language: TypeScript/Node.js
+- Framework: @modelcontextprotocol/sdk
+- Transport: HTTP (streamable) for remote deployment
+- Port: 8000
+- Database: SQLite for handyman data + call results + bids
+- Memory Layer: Mem0 (https://mem0.ai) for persistent user preferences
+- Voice Layer: Vapi (https://vapi.ai) for outbound proxy calling to handymen
+- Messaging Layer: WhatsApp Business API for handyman acceptance notifications
+- Payment Layer: Stripe for $5 base service fee
+
+## REQUIRED MCP TOOLS (12 Total)
+
+### Category A: User Context & Memory (2 tools)
+1. get_saved_preferences
+   - Purpose: Retrieve user's stored home info, budget, preferred handymen from Mem0
+   - Parameters: user_id (optional, auto-detect from Claude context)
+   - Returns: address, budget_max, preferred_handyman_id, access_notes, language, service_history
+
+2. update_saved_preferences
+   - Purpose: Save/update preferences in Mem0 for future bookings
+   - Parameters: user_id, address, budget_max, preferred_handyman_id, preferred_handyman_name, access_notes, language (all optional)
+   - Writes: To Mem0 memory layer for persistent storage
+
+### Category B: Discovery & Search (3 tools)
+3. search_handymen
+   - Purpose: Find handymen by service type, location, budget with Mem0 auto-fill
+   - Parameters: service_type (ac_repair|plumbing|electrical|cleaning|carpentry|painting), location (optional), max_budget (optional), sort_by (rating|price|bookings|trust_score)
+   - Returns: Ranked list with name, rating, bookings count, price, trust_score, available_times
+
+4. get_handyman_profile
+   - Purpose: Get full profile + reviews + trust score + ACRA registration
+   - Parameters: handyman_id
+   - Returns: Full profile, recent reviews (5 most recent), ACRA status, trust_score (0-10)
+
+5. compare_handyman_prices
+   - Purpose: Compare pricing across handymen for same service
+   - Parameters: service_type, location (optional)
+   - Returns: min_price, max_price, avg_price, all handymen with prices, best_value recommendation
+
+### Category C: Quoting (1 tool)
+6. quote_job
+   - Purpose: Get estimated price for specific job
+   - Parameters: service_type, complexity (basic|medium|complex), address (optional)
+   - Returns: min_price, max_price, duration_hours, what's_included
+
+### Category D: Introvert Mode - Vapi Proxy Calling (2 tools)
+7. call_handyman_proxy
+   - Purpose: Vapi calls 1 handyman ON USER'S BEHALF — user makes ZERO calls
+   - Parameters: handyman_id, handyman_phone, purpose (inquiry|booking|price_quote), service_type, datetime, address, max_budget
+   - Flow: Build script → Vapi calls handyman → "Available? Price?" → "Please wait, standby for WhatsApp" → Return result
+   - Returns: call_status (success|no_answer|busy), transcription, availability, price_quoted, datetime_offered, call_duration
+
+8. call_multiple_handymen_parallel
+   - Purpose: Vapi calls 3-5 handymen PARALLEL on user's behalf — find cheapest + fastest responder
+   - Parameters: service_type, location, purpose, datetime, address, max_budget, max_handymen (default 5)
+   - Flow: Find top handymen → Vapi calls all parallel (Promise.all) → Each says "Standby for WhatsApp" → Parse results → Rank cheapest first
+   - Returns: toCall (array), responses (array with price, availability, datetime), availableHandymen (filtered + ranked cheapest first)
+
+### Category E: Bid Results Presentation (2 tools)
+9. present_bid_results
+   - Purpose: Present call results from handymen in chat-friendly ranked table, cheapest highlighted
+   - Parameters: call_results (array), sort_by (price|datetime|rating)
+   - Flow: Filter available → Sort by price → Format as chat table with highlighting
+   - Returns: Formatted chat output showing:
+     ```
+     ✅ Vapi called 5 handymen parallel on YOUR BEHALF:
+     
+     📞 TOTAL CALLED: 5 (John, Sarah, Mike, Amy, David)
+     ⏱️ Time: 20 seconds (parallel)
+     
+     👍 RESPONSIVE + AVAILABLE: 3
+     
+     🏆 TOP 3 (CHEAPEST FIRST):
+     
+     | Rank | Name     | Price  | Time        | Rating | Response |
+     |------|----------|--------|-------------|--------|----------|
+     | 1⭐  | Sarah    | $75    | Sat 11AM    | 4.8⭐  | 8 sec    | 🏆 CHEAPEST
+     | 2    | John     | $80    | Sat 9AM     | 5.0⭐  | 12 sec   |
+     | 3    | Amy      | $82    | Sat 10AM    | 4.9⭐  | 15 sec   |
+     
+     💡 You made ZERO calls. Vapi did all calling for you.
+     💬 Reply "Book Sarah" to accept cheapest.
+     ```
+
+10. accept_winning_bid
+   - Purpose: User accepts cheapest handyman → triggers WhatsApp notification to handyman
+   - Parameters: handyman_id, booking_details (datetime, address, price, service_type)
+   - Flow: Get WhatsApp → Send acceptance message → Wait for YES/NO → If YES: Stripe link → If NO: offer next cheapest
+   - Returns: booking_id, handyman_whatsapp, stripe_payment_link, acceptance_status
+
+### Category E: Booking & Payment (2 tools)
+11. book_job
+   - Purpose: Create booking after handyman accepts via WhatsApp + trigger Stripe payment
+   - Parameters: booking_id, user_phone, user_id
+   - Flow: Create booking → Generate Stripe link ($5) → Explain fee → Vapi confirmation call
+   - Returns: booking_id, stripe_link, payment_explanation
+
+12. notify_arrival
+   - Purpose: Trigger Vapi voice alert when handyman is en route/at door/delayed
+   - Parameters: booking_id, notification_type (en_route|at_door|delayed)
+   - Returns: Notification sent confirmation
+
+## VAPI CALL SCRIPT TEMPLATES (in vapi.ts)
+
+**inquiry/booking:**

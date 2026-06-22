@@ -1,0 +1,363 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ── Tukang × Palmier design tokens ───────────────────────────────────── */
+
+  /* Typography — Inter system stack (Palmier uses no decorative fonts) */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+
+  /* Kept for legacy references in ClaudeFlowDemo */
+  --font-display: "Inter", -apple-system, sans-serif;
+  --font-body: "Inter", -apple-system, sans-serif;
+
+  /* Palette — near-black page, white text, amber kept only as brand badge */
+  --p-bg:        #0a0a0a;          /* page background */
+  --p-bg-raised: #111111;          /* slightly elevated surfaces */
+  --p-bg-card:   #161616;          /* card / screenshot container bg */
+  --p-border:    rgba(255,255,255,0.10); /* subtle borders */
+  --p-border-strong: rgba(255,255,255,0.18);
+
+  --p-text:      #ffffff;          /* primary text */
+  --p-text-dim:  rgba(255,255,255,0.65); /* secondary text */
+  --p-text-muted: rgba(255,255,255,0.38); /* muted / captions */
+
+  /* Amber — kept only for brand badge, not as primary accent */
+  --amber:       #f97316;
+  --amber-dim:   rgba(249,115,22,0.55);
+  --amber-glow:  rgba(249,115,22,0.10);
+
+  /* Light surface tokens — used inside ClaudeFlowDemo white island */
+  --surface:        #ffffff;
+  --surface-raised: #f5f5f5;
+  --surface-sunken: #ebebeb;
+  --surface-border: #d4d4d4;
+  --text-primary:   #0a0a0a;
+  --text-secondary: #525252;
+  --text-muted:     #a3a3a3;
+
+  /* Legacy aliases */
+  --ink:          #0a0a0a;
+  --ink-raised:   #111111;
+  --ink-surface:  #161616;
+  --ink-border:   rgba(255,255,255,0.10);
+  --paper:        #ffffff;
+  --paper-dim:    rgba(255,255,255,0.65);
+  --paper-muted:  rgba(255,255,255,0.38);
+}
+
+/* ─── Base theme ─────────────────────────────────────────────────────────── */
+:root {
+  --radius: 0.5rem;
+  --background: var(--p-bg);
+  --foreground: var(--p-text);
+  --card: var(--p-bg-card);
+  --card-foreground: var(--p-text);
+  --popover: var(--p-bg-raised);
+  --popover-foreground: var(--p-text);
+  --primary: var(--p-text);
+  --primary-foreground: var(--p-bg);
+  --secondary: var(--p-bg-raised);
+  --secondary-foreground: var(--p-text-dim);
+  --muted: var(--p-bg-raised);
+  --muted-foreground: var(--p-text-muted);
+  --accent: var(--p-bg-card);
+  --accent-foreground: var(--p-text);
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: var(--p-border);
+  --input: var(--p-bg-raised);
+  --ring: var(--p-text);
+  --chart-1: var(--amber);
+  --chart-2: #22c55e;
+  --chart-3: #3b82f6;
+  --chart-4: #a855f7;
+  --chart-5: #ec4899;
+  --sidebar: var(--p-bg-raised);
+  --sidebar-foreground: var(--p-text);
+  --sidebar-primary: var(--p-text);
+  --sidebar-primary-foreground: var(--p-bg);
+  --sidebar-accent: var(--p-bg-card);
+  --sidebar-accent-foreground: var(--p-text);
+  --sidebar-border: var(--p-border);
+  --sidebar-ring: var(--p-text);
+}
+
+/* ─── Base layer ─────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--p-bg);
+    color: var(--p-text);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans);
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    color: var(--p-text);
+  }
+
+  code, pre, kbd, .mono {
+    font-family: var(--font-mono);
+  }
+
+  a { color: inherit; }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [type="button"]:not(:disabled),
+  [type="submit"]:not(:disabled),
+  a[href],
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* ─── Component layer ────────────────────────────────────────────────────── */
+@layer components {
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    max-width: 900px;
+  }
+
+  @media (min-width: 768px) {
+    .container {
+      padding-left: 3rem;
+      padding-right: 3rem;
+    }
+  }
+
+  .flex {
+    min-height: 0;
+    min-width: 0;
+  }
+
+  /* ── Pill buttons (Palmier style) ── */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.375rem;
+    background: #ffffff;
+    color: #0a0a0a;
+    border: none;
+    border-radius: 9999px;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    text-decoration: none;
+    transition: opacity 0.15s ease;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:active { opacity: 0.7; transform: scale(0.98); }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.375rem;
+    background: transparent;
+    color: #ffffff;
+    border: 1px solid rgba(255,255,255,0.30);
+    border-radius: 9999px;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1;
+    text-decoration: none;
+    transition: border-color 0.15s ease, opacity 0.15s ease;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.60); }
+  .btn-ghost:active { opacity: 0.7; }
+
+  /* ── Screenshot / demo container (Palmier style) ── */
+  .demo-container {
+    border-radius: 12px;
+    border: 1px solid var(--p-border);
+    background: var(--p-bg-card);
+    overflow: hidden;
+  }
+
+  /* ── Status dot ── */
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 6px rgba(34,197,94,0.5);
+    animation: pulse-dot 2.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  /* ── Divider ── */
+  .p-divider {
+    border: none;
+    border-top: 1px solid var(--p-border);
+    margin: 0;
+  }
+
+  /* ── Code block ── */
+  .code-block {
+    background: var(--p-bg-card);
+    border: 1px solid var(--p-border);
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    color: var(--p-text);
+  }
+
+  /* ── Section spacing ── */
+  .p-section {
+    padding-top: 7rem;
+    padding-bottom: 7rem;
+  }
+
+  @media (max-width: 768px) {
+    .p-section { padding-top: 4rem; padding-bottom: 4rem; }
+  }
+
+  /* ── Feature link (Palmier "Learn more →") ── */
+  .feature-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--p-text-dim);
+    text-decoration: none;
+    transition: color 0.15s;
+    margin-top: 1.25rem;
+  }
+  .feature-link:hover { color: var(--p-text); }
+
+  /* ── Announcement bar ── */
+  .announce-bar {
+    background: var(--p-bg-raised);
+    border-bottom: 1px solid var(--p-border);
+    padding: 0.5rem 1.5rem;
+    text-align: center;
+    font-size: 0.8125rem;
+    color: var(--p-text-dim);
+  }
+
+  /* ── Hero animations ── */
+  @keyframes hero-content-in {
+    0%   { opacity: 0; transform: translateY(16px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  .hero-content {
+    animation: hero-content-in 0.6s cubic-bezier(0.23, 1, 0.32, 1) 0.1s both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-content { animation: none; opacity: 1; transform: none; }
+  }
+
+  /* ── Claude Flow Demo animations ── */
+  @keyframes flow-cursor-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+
+  @keyframes flow-bubble-in {
+    0%   { opacity: 0; transform: translateY(6px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes flow-tool-expand {
+    0%   { max-height: 0; opacity: 0; }
+    100% { max-height: 200px; opacity: 1; }
+  }
+
+  .flow-bubble-in {
+    animation: flow-bubble-in 0.3s cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+
+  .flow-tool-expand {
+    animation: flow-tool-expand 0.4s cubic-bezier(0.23, 1, 0.32, 1) both;
+    overflow: hidden;
+  }
+
+  .flow-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: var(--text-primary);
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    animation: flow-cursor-blink 0.9s step-end infinite;
+  }
+}
