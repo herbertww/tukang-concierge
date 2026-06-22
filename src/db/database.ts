@@ -115,6 +115,47 @@ function runMigrations(): void {
     );
   `);
 
+  // NEW: stores inbound WhatsApp replies from handymen with parsed quote data
+  db.run(`
+    CREATE TABLE IF NOT EXISTS handyman_quotes (
+      id               TEXT PRIMARY KEY,
+      session_id       TEXT NOT NULL,   -- links to the outreach batch
+      handyman_id      TEXT NOT NULL,
+      handyman_phone   TEXT NOT NULL,
+      raw_message      TEXT NOT NULL,   -- original WhatsApp text
+      price_quoted     REAL,            -- parsed price in SGD
+      available        INTEGER DEFAULT 1,
+      datetime_offered TEXT,            -- parsed available datetime
+      wa_msg_id        TEXT,
+      received_at      TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (handyman_id) REFERENCES handymen(id)
+    );
+  `);
+
+  // NEW: self-registration applications from handymen, beauticians, facialists
+  db.run(`
+    CREATE TABLE IF NOT EXISTS provider_applications (
+      id               TEXT PRIMARY KEY,
+      name             TEXT NOT NULL,
+      phone            TEXT NOT NULL,
+      whatsapp         TEXT,
+      email            TEXT,
+      provider_type    TEXT NOT NULL,   -- handyman|beautician|facialist|other
+      service_types    TEXT NOT NULL,   -- JSON array of services offered
+      location         TEXT NOT NULL,
+      price_min        REAL DEFAULT 0,
+      price_max        REAL DEFAULT 0,
+      acra_reg         TEXT,
+      bio              TEXT,
+      years_experience INTEGER DEFAULT 0,
+      portfolio_url    TEXT,
+      status           TEXT DEFAULT 'pending',  -- pending|approved|rejected
+      rejection_reason TEXT,
+      submitted_at     TEXT DEFAULT (datetime('now')),
+      reviewed_at      TEXT
+    );
+  `);
+
   persist();
 }
 

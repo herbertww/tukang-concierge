@@ -2,13 +2,14 @@
  * index.ts
  * Tukang MCP Server — Entry Point
  *
- * Exposes 12 MCP tools for chat-native handyman booking:
+ * Exposes 15 MCP tools for chat-native booking:
  *   Category A: User Context & Memory (2 tools)
  *   Category B: Discovery & Search (3 tools)
  *   Category C: Quoting (1 tool)
  *   Category D: Introvert Mode — Vapi Proxy Calling (2 tools)
  *   Category E: Bid Results Presentation (2 tools)
  *   Category F: Booking & Payment (2 tools)
+ *   Category G: Provider Self-Registration & Reviews (3 tools)
  *
  * Transport: HTTP (Streamable) on PORT 8000
  */
@@ -19,7 +20,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { randomUUID } from "crypto";
 
-import { initDatabase } from "./db/database.js";
+import { initDatabase, execute, queryOne } from "./db/database.js";
 import { config } from "./lib/config.js";
 
 // ── Tool Handlers ─────────────────────────────────────────────────────────────
@@ -62,144 +63,183 @@ import {
   notifyArrivalSchema,
 } from "./tools/booking.js";
 
+import {
+  registerProvider,
+  registerProviderSchema,
+  submitProviderReview,
+  submitProviderReviewSchema,
+  getProviderReviews,
+  getProviderReviewsSchema,
+} from "./tools/registration.js";
+
+// ─── WhatsApp Inbound Message Parser ─────────────────────────────────────────
+
+interface WAInboundMessage {
+  from: string;
+  text?: { body: string };
+  id: string;
+}
+
+interface WAEntry {
+  changes: Array<{
+    value: {
+      messages?: WAInboundMessage[];
+      metadata: { phone_number_id: string };
+    };
+  }>;
+}
+
+/**
+ * Attempts to parse a price from a handyman's WhatsApp reply.
+ * Handles formats like: "$80", "80 dollars", "SGD 80", "I can do it for 80"
+ */
+function parsePrice(text: string): number | null {
+  const patterns = [
+    /\$([\d.]+)/,                        // $80
+    /SGD\s*([\d.]+)/i,                  // SGD 80
+    /([\d.]+)\s*(?:dollars?|sgd|bucks)/i, // 80 dollars
+    /(?:for|at|quote[sd]?:?)\s*\$?([\d.]+)/i, // for 80 / quoted: 80
+    /^([\d.]+)$/,                        // bare number
+  ];
+  for (const p of patterns) {
+    const m = text.match(p);
+    if (m) return parseFloat(m[1]);
+  }
+  return null;
+}
+
+/**
+ * Attempts to parse availability from a handyman's WhatsApp reply.
+ */
+function parseAvailability(text: string): boolean {
+  const lower = text.toLowerCase();
+  const unavailable = /(not available|unavailable|cannot|can't|no slot|fully booked|busy)/i.test(lower);
+  if (unavailable) return false;
+  const available = /(available|yes|can do|sure|ok|confirm|accept|on board)/i.test(lower);
+  return available;
+}
+
+/**
+ * Attempts to parse a datetime string from a handyman's WhatsApp reply.
+ */
+function parseDatetime(text: string): string | null {
+  // Look for patterns like "tomorrow 2pm", "Monday 10am", "25 Jun 3pm"
+  const m = text.match(
+    /(?:today|tomorrow|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)[^\n]*?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm))/i
+  );
+  return m ? m[0].trim() : null;
+}
+
 // ─── MCP Server Setup ─────────────────────────────────────────────────────────
 
 function createMcpServer(): McpServer {
   const server = new McpServer({
     name: "tukang",
-    version: "1.0.0",
+    version: "1.1.0",
   });
 
   // ── Category A: User Context & Memory ──────────────────────────────────────
-
   server.tool(
     "get_saved_preferences",
     "Retrieve user's stored home info, budget, preferred handymen from Mem0 memory layer. Auto-fills future booking parameters.",
     getSavedPreferencesSchema.shape,
-    async (args) => {
-      const result = await getSavedPreferences(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await getSavedPreferences(args) }] })
   );
-
   server.tool(
     "update_saved_preferences",
     "Save or update user preferences (address, budget, preferred handyman, access notes, language) in Mem0 for persistent storage across sessions.",
     updateSavedPreferencesSchema.shape,
-    async (args) => {
-      const result = await updateSavedPreferences(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await updateSavedPreferences(args) }] })
   );
 
   // ── Category B: Discovery & Search ─────────────────────────────────────────
-
   server.tool(
     "search_handymen",
     "Find handymen by service type, location, and budget. Mem0 auto-fills location and budget from saved preferences. Returns ranked list with ratings, prices, trust scores, and available times.",
     searchHandymenSchema.shape,
-    async (args) => {
-      const result = await searchHandymen(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await searchHandymen(args) }] })
   );
-
   server.tool(
     "get_handyman_profile",
     "Get full handyman profile including reviews (5 most recent), ACRA business registration status, trust score breakdown (0-10), and available time slots.",
     getHandymanProfileSchema.shape,
-    async (args) => {
-      const result = await getHandymanProfile(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await getHandymanProfile(args) }] })
   );
-
   server.tool(
     "compare_handyman_prices",
     "Compare pricing across all handymen for the same service type. Returns min/max/avg prices, best value recommendation (trust-score-to-price ratio), and full sorted comparison table.",
     compareHandymanPricesSchema.shape,
-    async (args) => {
-      const result = await compareHandymanPrices(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await compareHandymanPrices(args) }] })
   );
 
   // ── Category C: Quoting ─────────────────────────────────────────────────────
-
   server.tool(
     "quote_job",
     "Get estimated price range, duration, and inclusions for a specific job based on service type and complexity (basic/medium/complex). Applies location surcharges for remote areas.",
     quoteJobSchema.shape,
-    async (args) => {
-      const result = await quoteJob(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await quoteJob(args) }] })
   );
 
   // ── Category D: Introvert Mode — Vapi Proxy Calling ────────────────────────
-
   server.tool(
     "call_handyman_proxy",
     "INTROVERT MODE: Vapi calls ONE handyman ON YOUR BEHALF — you make ZERO phone calls. Vapi asks about availability, price, and datetime. Returns call status, transcription, price quoted, and availability.",
     callHandymanProxySchema.shape,
-    async (args) => {
-      const result = await callHandymanProxy(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await callHandymanProxy(args) }] })
   );
-
   server.tool(
     "call_multiple_handymen_parallel",
     "INTROVERT MODE: Vapi calls 3-5 handymen IN PARALLEL on your behalf — you make ZERO calls. All calls happen simultaneously (Promise.all). Each handyman is told to standby for WhatsApp. Returns all responses ranked cheapest first.",
     callMultipleHandymenParallelSchema.shape,
-    async (args) => {
-      const result = await callMultipleHandymenParallel(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await callMultipleHandymenParallel(args) }] })
   );
 
   // ── Category E: Bid Results Presentation ───────────────────────────────────
-
   server.tool(
     "present_bid_results",
-    "Present call results from handymen in a chat-friendly ranked table with the cheapest highlighted. Shows total called, response times, prices, and availability. Formats output for direct display in Claude chat.",
+    "Present bid results in a chat-friendly ranked table. Pass session_id to auto-fetch live WhatsApp replies from DB (no manual input). Falls back to manual call_results array if no session_id.",
     presentBidResultsSchema.shape,
-    async (args) => {
-      const result = await presentBidResults(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await presentBidResults(args) }] })
   );
-
   server.tool(
     "accept_winning_bid",
     "User accepts the cheapest (or chosen) handyman. Triggers WhatsApp notification to winning handyman asking YES/NO confirmation. Sends rejection notices to runner-ups. Generates Stripe $5 platform fee payment link.",
     acceptWinningBidSchema.shape,
-    async (args) => {
-      const result = await acceptWinningBid(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await acceptWinningBid(args) }] })
   );
 
   // ── Category F: Booking & Payment ──────────────────────────────────────────
-
   server.tool(
     "book_job",
-    "Finalise booking after handyman accepts via WhatsApp. Creates confirmed booking record, generates Stripe $5 platform fee checkout link, and optionally triggers a Vapi confirmation call to the user. Explains the two-part payment structure.",
+    "Finalise booking after handyman accepts via WhatsApp. Creates confirmed booking record, generates Stripe $5 platform fee checkout link.",
     bookJobSchema.shape,
-    async (args) => {
-      const result = await bookJob(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await bookJob(args) }] })
   );
-
   server.tool(
     "notify_arrival",
     "Trigger WhatsApp voice/text alert when handyman is en_route, at_door, or delayed. Sends real-time notification to user's WhatsApp.",
     notifyArrivalSchema.shape,
-    async (args) => {
-      const result = await notifyArrival(args);
-      return { content: [{ type: "text", text: result }] };
-    }
+    async (args) => ({ content: [{ type: "text", text: await notifyArrival(args) }] })
+  );
+
+  // ── Category G: Provider Self-Registration & Reviews ───────────────────────
+  server.tool(
+    "register_provider",
+    "Self-registration for handymen, beauticians, and facialists. Submits an application to join the Tukang network. Supports all provider types with ratings, ACRA verification, and portfolio links.",
+    registerProviderSchema.shape,
+    async (args) => ({ content: [{ type: "text", text: await registerProvider(args) }] })
+  );
+  server.tool(
+    "submit_provider_review",
+    "Submit a star rating (1-5) and written review for a handyman or provider after a completed job or session. Automatically recalculates their average rating.",
+    submitProviderReviewSchema.shape,
+    async (args) => ({ content: [{ type: "text", text: await submitProviderReview(args) }] })
+  );
+  server.tool(
+    "get_provider_reviews",
+    "Fetch all reviews for a specific provider, including average rating, total review count, and formatted review history.",
+    getProviderReviewsSchema.shape,
+    async (args) => ({ content: [{ type: "text", text: await getProviderReviews(args) }] })
   );
 
   return server;
@@ -208,74 +248,155 @@ function createMcpServer(): McpServer {
 // ─── Express HTTP Server ──────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  // Initialise SQLite database
   await initDatabase();
   console.log("✅ Database initialised");
 
   const app = express();
   app.use(express.json());
 
-  // Session store for stateful transports
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
-  // ── MCP endpoint (POST /mcp) ────────────────────────────────────────────────
+  // ── MCP endpoint ────────────────────────────────────────────────────────────
   app.post("/mcp", async (req: Request, res: Response) => {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
-
     let transport: StreamableHTTPServerTransport;
-
     if (sessionId && transports.has(sessionId)) {
       transport = transports.get(sessionId)!;
     } else {
-      // New session
       const newSessionId = randomUUID();
       transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: () => newSessionId,
-        onsessioninitialized: (id) => {
-          transports.set(id, transport);
-        },
+        onsessioninitialized: (id) => { transports.set(id, transport); },
       });
-
-      transport.onclose = () => {
-        if (transport.sessionId) {
-          transports.delete(transport.sessionId);
-        }
-      };
-
+      transport.onclose = () => { if (transport.sessionId) transports.delete(transport.sessionId); };
       const server = createMcpServer();
       await server.connect(transport);
     }
-
     await transport.handleRequest(req, res, req.body);
   });
 
-  // ── SSE endpoint (GET /mcp) — for streaming responses ──────────────────────
   app.get("/mcp", async (req: Request, res: Response) => {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
-
     if (!sessionId || !transports.has(sessionId)) {
       res.status(400).json({ error: "Invalid or missing session ID" });
       return;
     }
-
-    const transport = transports.get(sessionId)!;
-    await transport.handleRequest(req, res);
+    await transports.get(sessionId)!.handleRequest(req, res);
   });
 
-  // ── DELETE /mcp — session cleanup ──────────────────────────────────────────
   app.delete("/mcp", async (req: Request, res: Response) => {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
-
     if (sessionId && transports.has(sessionId)) {
-      const transport = transports.get(sessionId)!;
-      await transport.handleRequest(req, res);
+      await transports.get(sessionId)!.handleRequest(req, res);
       transports.delete(sessionId);
     } else {
       res.status(404).json({ error: "Session not found" });
     }
   });
 
-  // ── Stripe webhook endpoint ─────────────────────────────────────────────────
+  // ── WhatsApp Webhook — GET (Meta verification handshake) ────────────────────
+  app.get("/webhooks/whatsapp", (req: Request, res: Response) => {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+
+    if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+      console.log("✅ WhatsApp webhook verified");
+      res.status(200).send(challenge);
+    } else {
+      console.warn("[WhatsApp Webhook] Verification failed — token mismatch");
+      res.status(403).json({ error: "Forbidden" });
+    }
+  });
+
+  // ── WhatsApp Webhook — POST (inbound messages from handymen) ────────────────
+  app.post("/webhooks/whatsapp", async (req: Request, res: Response) => {
+    try {
+      const body = req.body as { object: string; entry: WAEntry[] };
+
+      if (body.object !== "whatsapp_business_account") {
+        res.sendStatus(404);
+        return;
+      }
+
+      for (const entry of body.entry ?? []) {
+        for (const change of entry.changes ?? []) {
+          const messages = change.value?.messages ?? [];
+          for (const msg of messages) {
+            const fromPhone = msg.from; // E.164 without +
+            const text = msg.text?.body ?? "";
+            const waId = msg.id;
+
+            if (!text) continue;
+
+            // Look up handyman by phone
+            const handyman = queryOne<{ id: string; name: string }>(
+              "SELECT id, name FROM handymen WHERE REPLACE(phone, '+', '') = ? OR REPLACE(whatsapp, '+', '') = ?",
+              [fromPhone, fromPhone]
+            );
+
+            if (!handyman) {
+              console.log(`[WhatsApp] Inbound from unknown number ${fromPhone}: ${text}`);
+              continue;
+            }
+
+            // Find latest open session for this handyman
+            const latestSession = queryOne<{ session_id: string }>(
+              `SELECT session_id FROM handyman_quotes
+               WHERE handyman_id = ?
+               ORDER BY received_at DESC LIMIT 1`,
+              [handyman.id]
+            );
+
+            const sessionId = latestSession?.session_id ?? randomUUID();
+            const price = parsePrice(text);
+            const available = parseAvailability(text);
+            const datetime = parseDatetime(text);
+
+            // Upsert quote — update if exists for this session, insert if new
+            const existing = queryOne(
+              "SELECT id FROM handyman_quotes WHERE session_id = ? AND handyman_id = ?",
+              [sessionId, handyman.id]
+            );
+
+            if (existing) {
+              execute(
+                `UPDATE handyman_quotes SET raw_message = ?, price_quoted = ?, available = ?,
+                 datetime_offered = ?, wa_msg_id = ?, received_at = datetime('now')
+                 WHERE session_id = ? AND handyman_id = ?`,
+                [text, price, available ? 1 : 0, datetime, waId, sessionId, handyman.id]
+              );
+            } else {
+              execute(
+                `INSERT INTO handyman_quotes
+                 (id, session_id, handyman_id, handyman_phone, raw_message, price_quoted, available, datetime_offered, wa_msg_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [randomUUID(), sessionId, handyman.id, fromPhone, text, price, available ? 1 : 0, datetime, waId]
+              );
+            }
+
+            // Also log to whatsapp_messages
+            execute(
+              `INSERT INTO whatsapp_messages (id, handyman_id, direction, message, wa_msg_id)
+               VALUES (?, ?, 'inbound', ?, ?)`,
+              [randomUUID(), handyman.id, text, waId]
+            );
+
+            console.log(
+              `[WhatsApp] 📩 ${handyman.name}: "${text}" | price=$${price ?? 'n/a'} available=${available} datetime=${datetime ?? 'n/a'}`
+            );
+          }
+        }
+      }
+
+      res.sendStatus(200);
+    } catch (err) {
+      console.error("[WhatsApp Webhook] Error:", err);
+      res.sendStatus(500);
+    }
+  });
+
+  // ── Stripe webhook ──────────────────────────────────────────────────────────
   app.post(
     "/webhooks/stripe",
     express.raw({ type: "application/json" }),
@@ -284,12 +405,10 @@ async function main(): Promise<void> {
       try {
         const { constructWebhookEvent } = await import("./lib/stripe.js");
         const event = constructWebhookEvent(req.body as Buffer, sig);
-
         if (event.type === "checkout.session.completed") {
           const session = event.data.object as { metadata?: { booking_id?: string } };
           const bookingId = session.metadata?.booking_id;
           if (bookingId) {
-            const { execute } = await import("./db/database.js");
             execute(
               "UPDATE bookings SET payment_status = 'paid', status = 'confirmed' WHERE id = ?",
               [bookingId]
@@ -297,7 +416,6 @@ async function main(): Promise<void> {
             console.log(`✅ Payment confirmed for booking ${bookingId}`);
           }
         }
-
         res.json({ received: true });
       } catch (err) {
         console.error("[Stripe Webhook] Error:", err);
@@ -306,28 +424,24 @@ async function main(): Promise<void> {
     }
   );
 
-  // ── Payment success/cancel pages ────────────────────────────────────────────
+  // ── Payment pages ───────────────────────────────────────────────────────────
   app.get("/payment/success", (req: Request, res: Response) => {
     const bookingId = req.query.booking_id as string;
-    res.send(`
-      <html><body style="font-family:sans-serif;text-align:center;padding:40px">
-        <h1>✅ Payment Successful!</h1>
-        <p>Your $5 Tukang platform fee has been received.</p>
-        <p>Booking ID: <strong>${bookingId}</strong></p>
-        <p>Your handyman will arrive at the scheduled time. You will receive a WhatsApp notification when they are en route.</p>
-      </body></html>
-    `);
+    res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:40px">
+      <h1>✅ Payment Successful!</h1>
+      <p>Your $5 Tukang platform fee has been received.</p>
+      <p>Booking ID: <strong>${bookingId}</strong></p>
+      <p>Your handyman will arrive at the scheduled time. You will receive a WhatsApp notification when they are en route.</p>
+    </body></html>`);
   });
 
   app.get("/payment/cancel", (req: Request, res: Response) => {
     const bookingId = req.query.booking_id as string;
-    res.send(`
-      <html><body style="font-family:sans-serif;text-align:center;padding:40px">
-        <h1>Payment Cancelled</h1>
-        <p>Your booking (ID: <strong>${bookingId}</strong>) is still pending.</p>
-        <p>Please return to the chat to complete payment.</p>
-      </body></html>
-    `);
+    res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:40px">
+      <h1>Payment Cancelled</h1>
+      <p>Your booking (ID: <strong>${bookingId}</strong>) is still pending.</p>
+      <p>Please return to the chat to complete payment.</p>
+    </body></html>`);
   });
 
   // ── Health check ────────────────────────────────────────────────────────────
@@ -335,30 +449,32 @@ async function main(): Promise<void> {
     res.json({
       status: "ok",
       service: "tukang-mcp-server",
-      version: "1.0.0",
-      tools: 12,
+      version: "1.1.0",
+      tools: 15,
+      webhooks: ["/webhooks/whatsapp", "/webhooks/stripe"],
       timestamp: new Date().toISOString(),
     });
   });
 
-  // ── Start server ────────────────────────────────────────────────────────────
   app.listen(config.port, () => {
     console.log(`
-🔨 Tukang MCP Server running on port ${config.port}
+🔨 Tukang MCP Server v1.1.0 running on port ${config.port}
 
-📡 MCP Endpoint:    http://localhost:${config.port}/mcp
-🏥 Health Check:    http://localhost:${config.port}/health
-💳 Stripe Webhook:  http://localhost:${config.port}/webhooks/stripe
+📡 MCP Endpoint:       http://localhost:${config.port}/mcp
+🏥 Health Check:       http://localhost:${config.port}/health
+💳 Stripe Webhook:     http://localhost:${config.port}/webhooks/stripe
+📲 WhatsApp Webhook:   http://localhost:${config.port}/webhooks/whatsapp
 
-🛠️  12 Tools Available:
-   Category A — Memory:    get_saved_preferences, update_saved_preferences
-   Category B — Discovery: search_handymen, get_handyman_profile, compare_handyman_prices
-   Category C — Quoting:   quote_job
-   Category D — Calling:   call_handyman_proxy, call_multiple_handymen_parallel
-   Category E — Bids:      present_bid_results, accept_winning_bid
-   Category F — Booking:   book_job, notify_arrival
+🛠️  15 Tools Available:
+   Category A — Memory:        get_saved_preferences, update_saved_preferences
+   Category B — Discovery:     search_handymen, get_handyman_profile, compare_handyman_prices
+   Category C — Quoting:       quote_job
+   Category D — Calling:       call_handyman_proxy, call_multiple_handymen_parallel
+   Category E — Bids:          present_bid_results (auto DB), accept_winning_bid
+   Category F — Booking:       book_job, notify_arrival
+   Category G — Registration:  register_provider, submit_provider_review, get_provider_reviews
 
-💡 Zero context switching. Zero phone calls. Introvert mode ON.
+💡 WhatsApp replies from handymen are now captured automatically.
     `);
   });
 }

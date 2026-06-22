@@ -1,11 +1,11 @@
 /**
  * bids.ts
- * Tool 9: present_bid_results
+ * Tool 9: present_bid_results  — auto-reads from handyman_quotes DB table
  * Tool 10: accept_winning_bid
  */
 
 import { z } from "zod";
-import { execute, queryOne } from "../db/database.js";
+import { execute, queryAll, queryOne } from "../db/database.js";
 import {
   sendAcceptanceNotification,
   sendRejectionNotice,
@@ -30,9 +30,19 @@ const CallResultItemSchema = z.object({
 });
 
 export const presentBidResultsSchema = z.object({
+  session_id: z
+    .string()
+    .optional()
+    .describe(
+      "Session ID from contact_multiple_handymen / call_multiple_handymen_parallel. " +
+      "If provided, results are auto-fetched from the database (no manual input needed)."
+    ),
   call_results: z
     .array(CallResultItemSchema)
-    .describe("Array of call results from call_multiple_handymen_parallel."),
+    .optional()
+    .describe(
+      "Manual call results array. Only required if session_id is not provided."
+    ),
   sort_by: z
     .enum(["price", "datetime", "rating"])
     .default("price")
@@ -44,28 +54,95 @@ export const presentBidResultsSchema = z.object({
 
 export type PresentBidResultsInput = z.infer<typeof presentBidResultsSchema>;
 
+interface QuoteRow {
+  id: string;
+  handyman_id: string;
+  handyman_phone: string;
+  raw_message: string;
+  price_quoted: number | null;
+  available: number;
+  datetime_offered: string | null;
+  received_at: string;
+}
+
+interface HandymanRow {
+  id: string;
+  name: string;
+  rating: number;
+  trust_score: number;
+  whatsapp: string | null;
+}
+
 export async function presentBidResults(
   input: PresentBidResultsInput
 ): Promise<string> {
-  const available = input.call_results
+  let results: Array<{
+    handyman_id: string;
+    name: string;
+    call_status: string;
+    availability: boolean;
+    price_quoted: number | null;
+    datetime_offered: string | null;
+    rating?: number;
+    trust_score?: number;
+    response_time_seconds?: number;
+    whatsapp?: string | null;
+  }> = [];
+
+  // ── Auto-fetch from DB if session_id provided ──────────────────────────────
+  if (input.session_id) {
+    const quotes = queryAll<QuoteRow>(
+      `SELECT * FROM handyman_quotes WHERE session_id = ? ORDER BY price_quoted ASC`,
+      [input.session_id]
+    );
+
+    results = quotes.map((q) => {
+      const handyman = queryOne<HandymanRow>(
+        "SELECT id, name, rating, trust_score, whatsapp FROM handymen WHERE id = ?",
+        [q.handyman_id]
+      );
+      return {
+        handyman_id: q.handyman_id,
+        name: handyman?.name ?? q.handyman_phone,
+        call_status: q.available ? "success" : "unavailable",
+        availability: q.available === 1,
+        price_quoted: q.price_quoted,
+        datetime_offered: q.datetime_offered,
+        rating: handyman?.rating,
+        trust_score: handyman?.trust_score,
+        whatsapp: handyman?.whatsapp ?? q.handyman_phone,
+      };
+    });
+  } else if (input.call_results?.length) {
+    // ── Fallback: use manually-passed results ────────────────────────────────
+    results = input.call_results.map((r) => ({
+      ...r,
+      availability: r.availability,
+    }));
+  } else {
+    return JSON.stringify({
+      error: "Provide either session_id (auto DB lookup) or call_results array.",
+    });
+  }
+
+  const available = results
     .filter((r) => r.availability && r.price_quoted !== null)
     .sort((a, b) => {
       if (input.sort_by === "price") return (a.price_quoted ?? 999) - (b.price_quoted ?? 999);
       if (input.sort_by === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
-      return 0; // datetime sort — keep original order
+      return 0;
     });
 
-  const totalCalled = input.total_called ?? input.call_results.length;
-  const namesCalled = input.names_called ?? input.call_results.map((r) => r.name);
+  const totalCalled = input.total_called ?? results.length;
+  const namesCalled = input.names_called ?? results.map((r) => r.name);
   const timeSeconds = input.total_time_seconds ?? 0;
 
-  // Build chat-friendly formatted table
   const tableRows = available
     .slice(0, 5)
     .map((r, i) => {
       const rank = i === 0 ? "1⭐" : `${i + 1}`;
       const badge = i === 0 ? " 🏆 CHEAPEST" : "";
-      const price = `$${r.price_quoted}`;
+      const price = r.price_quoted ? `$${r.price_quoted}` : "TBD";
       const time = r.datetime_offered ?? "TBD";
       const rating = r.rating ? `${r.rating}⭐` : "N/A";
       const response = r.response_time_seconds ? `${r.response_time_seconds}s` : "N/A";
@@ -74,12 +151,13 @@ export async function presentBidResults(
     .join("\n");
 
   const cheapest = available[0];
+  const source = input.session_id ? "📲 Live WhatsApp replies (auto-fetched)" : "📞 Vapi call results";
 
   const formattedOutput = `
-✅ Vapi called ${totalCalled} handymen parallel on YOUR BEHALF:
+✅ Source: ${source}
 
-📞 TOTAL CALLED: ${totalCalled} (${namesCalled.join(", ")})
-⏱️ Time: ${timeSeconds} seconds (parallel)
+📞 TOTAL CONTACTED: ${totalCalled} (${namesCalled.join(", ")})
+${timeSeconds ? `⏱️ Time: ${timeSeconds} seconds` : ""}
 
 👍 RESPONSIVE + AVAILABLE: ${available.length}
 
@@ -87,14 +165,15 @@ export async function presentBidResults(
 
 | Rank | Name     | Price  | Time        | Rating | Response |
 |------|----------|--------|-------------|--------|----------|
-${tableRows}
+${tableRows || "| — | No responses yet | — | — | — | — |"}
 
-💡 You made ZERO calls. Vapi did all calling for you.
-${cheapest ? `💬 Reply "Book ${cheapest.name}" to accept cheapest.` : "No handymen available at this time."}
+💡 You made ZERO calls. Tukang handled all outreach for you.
+${cheapest ? `💬 Reply "Book ${cheapest.name}" to accept cheapest ($${cheapest.price_quoted}).` : "No handymen available at this time. Try expanding your search area."}
   `.trim();
 
   return JSON.stringify({
     formatted_output: formattedOutput,
+    source: input.session_id ? "db" : "manual",
     available_count: available.length,
     cheapest: cheapest
       ? {
@@ -142,7 +221,7 @@ export const acceptWinningBidSchema = z.object({
 
 export type AcceptWinningBidInput = z.infer<typeof acceptWinningBidSchema>;
 
-interface HandymanRow {
+interface HandymanRowFull {
   id: string;
   name: string;
   phone: string;
@@ -152,7 +231,7 @@ interface HandymanRow {
 export async function acceptWinningBid(
   input: AcceptWinningBidInput
 ): Promise<string> {
-  const handyman = queryOne<HandymanRow>(
+  const handyman = queryOne<HandymanRowFull>(
     "SELECT id, name, phone, whatsapp FROM handymen WHERE id = ?",
     [input.handyman_id]
   );
@@ -164,7 +243,6 @@ export async function acceptWinningBid(
   const bookingId = uuidv4();
   const userId = input.user_id ?? "default_user";
 
-  // Create pending booking
   execute(
     `INSERT INTO bookings (id, user_id, handyman_id, service_type, address, datetime, price, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
@@ -179,7 +257,6 @@ export async function acceptWinningBid(
     ]
   );
 
-  // Send WhatsApp acceptance notification to winning handyman
   const waPhone = handyman.whatsapp ?? handyman.phone;
   const waResult = await sendAcceptanceNotification({
     handymanName: handyman.name,
@@ -191,7 +268,6 @@ export async function acceptWinningBid(
     bookingId,
   });
 
-  // Send rejection notices to runner-ups
   if (input.runner_up_handymen?.length) {
     for (const ru of input.runner_up_handymen) {
       const ruPhone = ru.whatsapp ?? "";
@@ -201,7 +277,6 @@ export async function acceptWinningBid(
     }
   }
 
-  // Create Stripe checkout session
   let stripeLink: string | null = null;
   let stripeSessionId: string | null = null;
   try {
@@ -213,7 +288,6 @@ export async function acceptWinningBid(
     });
     stripeLink = checkout.paymentUrl;
     stripeSessionId = checkout.sessionId;
-
     execute(
       "UPDATE bookings SET stripe_session = ? WHERE id = ?",
       [stripeSessionId, bookingId]
@@ -225,11 +299,7 @@ export async function acceptWinningBid(
   return JSON.stringify({
     booking_id: bookingId,
     status: "pending_acceptance",
-    handyman: {
-      id: handyman.id,
-      name: handyman.name,
-      whatsapp: waPhone,
-    },
+    handyman: { id: handyman.id, name: handyman.name, whatsapp: waPhone },
     whatsapp_sent: waResult.success,
     whatsapp_message_id: waResult.messageId,
     stripe_payment_link: stripeLink,
