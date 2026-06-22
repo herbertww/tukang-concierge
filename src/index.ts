@@ -6,7 +6,7 @@
  *   Category A: User Context & Memory (2 tools)
  *   Category B: Discovery & Search (3 tools)
  *   Category C: Quoting (1 tool)
- *   Category D: Introvert Mode — Vapi Proxy Calling (2 tools)
+ *   Category D: Contractor Outreach via WhatsApp (2 tools)
  *   Category E: Bid Results Presentation (2 tools)
  *   Category F: Booking & Payment (2 tools)
  *   Category G: Provider Self-Registration & Reviews (3 tools)
@@ -43,10 +43,10 @@ import {
 import { quoteJob, quoteJobSchema } from "./tools/quoting.js";
 
 import {
-  callHandymanProxy,
-  callHandymanProxySchema,
-  callMultipleHandymenParallel,
-  callMultipleHandymenParallelSchema,
+  whatsappHandyman,
+  whatsappHandymanSchema,
+  whatsappMultipleHandymen,
+  whatsappMultipleHandymenSchema,
 } from "./tools/calling.js";
 
 import {
@@ -91,15 +91,16 @@ interface WAEntry {
 
 /**
  * Attempts to parse a price from a handyman's WhatsApp reply.
- * Handles formats like: "$80", "80 dollars", "SGD 80", "I can do it for 80"
+ * Handles formats like: "RM80", "$80", "80 ringgit", "I can do it for 80"
  */
 function parsePrice(text: string): number | null {
   const patterns = [
-    /\$([\d.]+)/,                        // $80
-    /SGD\s*([\d.]+)/i,                  // SGD 80
-    /([\d.]+)\s*(?:dollars?|sgd|bucks)/i, // 80 dollars
-    /(?:for|at|quote[sd]?:?)\s*\$?([\d.]+)/i, // for 80 / quoted: 80
-    /^([\d.]+)$/,                        // bare number
+    /RM\s*([\d.]+)/i,                         // RM80
+    /\$([\d.]+)/,                              // $80
+    /SGD\s*([\d.]+)/i,                         // SGD 80
+    /([\d.]+)\s*(?:dollars?|ringgit|sgd|bucks)/i, // 80 ringgit
+    /(?:for|at|quote[sd]?:?)\s*RM?\$?([\d.]+)/i,  // for 80 / for RM80
+    /^([\d.]+)$/,                              // bare number
   ];
   for (const p of patterns) {
     const m = text.match(p);
@@ -112,10 +113,9 @@ function parsePrice(text: string): number | null {
  * Attempts to parse availability from a handyman's WhatsApp reply.
  */
 function parseAvailability(text: string): boolean {
-  const lower = text.toLowerCase();
-  const unavailable = /(not available|unavailable|cannot|can't|no slot|fully booked|busy)/i.test(lower);
+  const unavailable = /(not available|unavailable|cannot|can't|no slot|fully booked|busy|no\b)/i.test(text);
   if (unavailable) return false;
-  const available = /(available|yes|can do|sure|ok|confirm|accept|on board)/i.test(lower);
+  const available = /(available|yes|can do|sure|ok|confirm|accept|on board|boleh)/i.test(text);
   return available;
 }
 
@@ -123,9 +123,8 @@ function parseAvailability(text: string): boolean {
  * Attempts to parse a datetime string from a handyman's WhatsApp reply.
  */
 function parseDatetime(text: string): string | null {
-  // Look for patterns like "tomorrow 2pm", "Monday 10am", "25 Jun 3pm"
   const m = text.match(
-    /(?:today|tomorrow|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)[^\n]*?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm))/i
+    /(?:today|tomorrow|esok|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)[^\n]*?(?:\d{1,2}(?::\d{2})?\s*(?:am|pm))/i
   );
   return m ? m[0].trim() : null;
 }
@@ -135,7 +134,7 @@ function parseDatetime(text: string): string | null {
 function createMcpServer(): McpServer {
   const server = new McpServer({
     name: "tukang",
-    version: "1.1.0",
+    version: "1.2.0",
   });
 
   // ── Category A: User Context & Memory ──────────────────────────────────────
@@ -161,7 +160,7 @@ function createMcpServer(): McpServer {
   );
   server.tool(
     "get_handyman_profile",
-    "Get full handyman profile including reviews (5 most recent), ACRA business registration status, trust score breakdown (0-10), and available time slots.",
+    "Get full handyman profile including reviews (5 most recent), business registration status, trust score breakdown (0-10), and available time slots.",
     getHandymanProfileSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await getHandymanProfile(args) }] })
   );
@@ -180,18 +179,18 @@ function createMcpServer(): McpServer {
     async (args) => ({ content: [{ type: "text", text: await quoteJob(args) }] })
   );
 
-  // ── Category D: Introvert Mode — Vapi Proxy Calling ────────────────────────
+  // ── Category D: Contractor Outreach via WhatsApp ────────────────────────────
   server.tool(
-    "call_handyman_proxy",
-    "INTROVERT MODE: Vapi calls ONE handyman ON YOUR BEHALF — you make ZERO phone calls. Vapi asks about availability, price, and datetime. Returns call status, transcription, price quoted, and availability.",
-    callHandymanProxySchema.shape,
-    async (args) => ({ content: [{ type: "text", text: await callHandymanProxy(args) }] })
+    "whatsapp_handyman",
+    "Send a WhatsApp message to ONE contractor on the customer's behalf asking for availability, price, and datetime. Returns session_id to track replies. Contractor replies are captured automatically by the inbound webhook.",
+    whatsappHandymanSchema.shape,
+    async (args) => ({ content: [{ type: "text", text: await whatsappHandyman(args) }] })
   );
   server.tool(
-    "call_multiple_handymen_parallel",
-    "INTROVERT MODE: Vapi calls 3-5 handymen IN PARALLEL on your behalf — you make ZERO calls. All calls happen simultaneously (Promise.all). Each handyman is told to standby for WhatsApp. Returns all responses ranked cheapest first.",
-    callMultipleHandymenParallelSchema.shape,
-    async (args) => ({ content: [{ type: "text", text: await callMultipleHandymenParallel(args) }] })
+    "whatsapp_multiple_handymen",
+    "Send WhatsApp messages to 1-5 contractors IN PARALLEL on the customer's behalf. All messages sent simultaneously. Returns a shared session_id — use present_bid_results with it to see contractor replies as they arrive via webhook.",
+    whatsappMultipleHandymenSchema.shape,
+    async (args) => ({ content: [{ type: "text", text: await whatsappMultipleHandymen(args) }] })
   );
 
   // ── Category E: Bid Results Presentation ───────────────────────────────────
@@ -203,7 +202,7 @@ function createMcpServer(): McpServer {
   );
   server.tool(
     "accept_winning_bid",
-    "User accepts the cheapest (or chosen) handyman. Triggers WhatsApp notification to winning handyman asking YES/NO confirmation. Sends rejection notices to runner-ups. Generates Stripe $5 platform fee payment link.",
+    "User accepts the cheapest (or chosen) contractor. Triggers WhatsApp confirmation message to winner asking YES/NO. Sends rejection notices to runner-ups. Generates Stripe $5 platform fee payment link.",
     acceptWinningBidSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await acceptWinningBid(args) }] })
   );
@@ -211,13 +210,13 @@ function createMcpServer(): McpServer {
   // ── Category F: Booking & Payment ──────────────────────────────────────────
   server.tool(
     "book_job",
-    "Finalise booking after handyman accepts via WhatsApp. Creates confirmed booking record, generates Stripe $5 platform fee checkout link.",
+    "Finalise booking after contractor accepts via WhatsApp. Creates confirmed booking record, generates Stripe $5 platform fee checkout link.",
     bookJobSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await bookJob(args) }] })
   );
   server.tool(
     "notify_arrival",
-    "Trigger WhatsApp voice/text alert when handyman is en_route, at_door, or delayed. Sends real-time notification to user's WhatsApp.",
+    "Send WhatsApp notification when contractor is en_route, at_door, or delayed. Sends real-time update to user's WhatsApp.",
     notifyArrivalSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await notifyArrival(args) }] })
   );
@@ -225,13 +224,13 @@ function createMcpServer(): McpServer {
   // ── Category G: Provider Self-Registration & Reviews ───────────────────────
   server.tool(
     "register_provider",
-    "Self-registration for handymen, beauticians, and facialists. Submits an application to join the Tukang network. Supports all provider types with ratings, ACRA verification, and portfolio links.",
+    "Self-registration for handymen, beauticians, and facialists. Submits an application to join the Tukang network. Supports all provider types with ratings, business verification, and portfolio links.",
     registerProviderSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await registerProvider(args) }] })
   );
   server.tool(
     "submit_provider_review",
-    "Submit a star rating (1-5) and written review for a handyman or provider after a completed job or session. Automatically recalculates their average rating.",
+    "Submit a star rating (1-5) and written review for a handyman or provider after a completed job. Automatically recalculates their average rating.",
     submitProviderReviewSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await submitProviderReview(args) }] })
   );
@@ -309,7 +308,7 @@ async function main(): Promise<void> {
     }
   });
 
-  // ── WhatsApp Webhook — POST (inbound messages from handymen) ────────────────
+  // ── WhatsApp Webhook — POST (inbound messages from contractors) ─────────────
   app.post("/webhooks/whatsapp", async (req: Request, res: Response) => {
     try {
       const body = req.body as { object: string; entry: WAEntry[] };
@@ -323,13 +322,13 @@ async function main(): Promise<void> {
         for (const change of entry.changes ?? []) {
           const messages = change.value?.messages ?? [];
           for (const msg of messages) {
-            const fromPhone = msg.from; // E.164 without +
+            const fromPhone = msg.from;
             const text = msg.text?.body ?? "";
             const waId = msg.id;
 
             if (!text) continue;
 
-            // Look up handyman by phone
+            // Look up contractor by phone
             const handyman = queryOne<{ id: string; name: string }>(
               "SELECT id, name FROM handymen WHERE REPLACE(phone, '+', '') = ? OR REPLACE(whatsapp, '+', '') = ?",
               [fromPhone, fromPhone]
@@ -340,7 +339,7 @@ async function main(): Promise<void> {
               continue;
             }
 
-            // Find latest open session for this handyman
+            // Find latest open session for this contractor
             const latestSession = queryOne<{ session_id: string }>(
               `SELECT session_id FROM handyman_quotes
                WHERE handyman_id = ?
@@ -353,7 +352,7 @@ async function main(): Promise<void> {
             const available = parseAvailability(text);
             const datetime = parseDatetime(text);
 
-            // Upsert quote — update if exists for this session, insert if new
+            // Upsert quote
             const existing = queryOne(
               "SELECT id FROM handyman_quotes WHERE session_id = ? AND handyman_id = ?",
               [sessionId, handyman.id]
@@ -375,7 +374,7 @@ async function main(): Promise<void> {
               );
             }
 
-            // Also log to whatsapp_messages
+            // Log to whatsapp_messages
             execute(
               `INSERT INTO whatsapp_messages (id, handyman_id, direction, message, wa_msg_id)
                VALUES (?, ?, 'inbound', ?, ?)`,
@@ -383,7 +382,7 @@ async function main(): Promise<void> {
             );
 
             console.log(
-              `[WhatsApp] 📩 ${handyman.name}: "${text}" | price=$${price ?? 'n/a'} available=${available} datetime=${datetime ?? 'n/a'}`
+              `[WhatsApp] 📩 ${handyman.name}: "${text}" | price=RM${price ?? 'n/a'} available=${available} datetime=${datetime ?? 'n/a'}`
             );
           }
         }
@@ -429,9 +428,9 @@ async function main(): Promise<void> {
     const bookingId = req.query.booking_id as string;
     res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:40px">
       <h1>✅ Payment Successful!</h1>
-      <p>Your $5 Tukang platform fee has been received.</p>
+      <p>Your platform fee has been received.</p>
       <p>Booking ID: <strong>${bookingId}</strong></p>
-      <p>Your handyman will arrive at the scheduled time. You will receive a WhatsApp notification when they are en route.</p>
+      <p>Your contractor will arrive at the scheduled time. You will receive a WhatsApp notification when they are en route.</p>
     </body></html>`);
   });
 
@@ -449,7 +448,7 @@ async function main(): Promise<void> {
     res.json({
       status: "ok",
       service: "tukang-mcp-server",
-      version: "1.1.0",
+      version: "1.2.0",
       tools: 15,
       webhooks: ["/webhooks/whatsapp", "/webhooks/stripe"],
       timestamp: new Date().toISOString(),
@@ -458,7 +457,7 @@ async function main(): Promise<void> {
 
   app.listen(config.port, () => {
     console.log(`
-🔨 Tukang MCP Server v1.1.0 running on port ${config.port}
+🔨 Tukang MCP Server v1.2.0 running on port ${config.port}
 
 📡 MCP Endpoint:       http://localhost:${config.port}/mcp
 🏥 Health Check:       http://localhost:${config.port}/health
@@ -469,12 +468,12 @@ async function main(): Promise<void> {
    Category A — Memory:        get_saved_preferences, update_saved_preferences
    Category B — Discovery:     search_handymen, get_handyman_profile, compare_handyman_prices
    Category C — Quoting:       quote_job
-   Category D — Calling:       call_handyman_proxy, call_multiple_handymen_parallel
-   Category E — Bids:          present_bid_results (auto DB), accept_winning_bid
+   Category D — Outreach:      whatsapp_handyman, whatsapp_multiple_handymen
+   Category E — Bids:          present_bid_results, accept_winning_bid
    Category F — Booking:       book_job, notify_arrival
    Category G — Registration:  register_provider, submit_provider_review, get_provider_reviews
 
-💡 WhatsApp replies from handymen are now captured automatically.
+💡 Contractor WhatsApp replies are captured automatically via inbound webhook.
     `);
   });
 }
