@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { queryAll, queryOne } from "../db/database.js";
 import { getPreferences } from "../lib/mem0.js";
+import { SERVICE_TYPES } from "../lib/service-types.js";
 
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 
@@ -38,9 +39,6 @@ interface ReviewRow {
   service_type: string | null;
   created_at: string;
 }
-
-const SERVICE_TYPES = ["ac_repair", "plumbing", "electrical", "cleaning", "carpentry", "painting"] as const;
-type ServiceType = typeof SERVICE_TYPES[number];
 
 // ─── Tool 3: search_handymen ──────────────────────────────────────────────────
 
