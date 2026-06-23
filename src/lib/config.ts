@@ -27,4 +27,10 @@ export const config = {
     serviceFeePrice: optional("STRIPE_SERVICE_FEE_PRICE_ID"),
     publicUrl: optional("PUBLIC_URL", "http://localhost:8000"),
   },
+
+  qwen: {
+    apiKey: optional("QWEN_API_KEY"),
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    model: optional("QWEN_MODEL", "qwen-max"),
+  },
 } as const;
