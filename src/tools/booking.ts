@@ -7,14 +7,12 @@
 import { z } from "zod";
 import { execute, queryOne } from "../db/database.js";
 import { createServiceFeeCheckout } from "../lib/stripe.js";
-import { makeVapiCall } from "../lib/vapi.js";
 import { sendArrivalNotification } from "../lib/whatsapp.js";
 
 // ─── Tool 11: book_job ────────────────────────────────────────────────────────
 
 export const bookJobSchema = z.object({
   booking_id: z.string().describe("Booking ID from accept_winning_bid."),
-  user_phone: z.string().optional().describe("User's phone number for Vapi confirmation call."),
   user_id: z.string().optional().describe("User ID."),
   user_email: z.string().optional().describe("User email for Stripe receipt."),
 });
@@ -97,29 +95,6 @@ export async function bookJob(input: BookJobInput): Promise<string> {
     [booking.id]
   );
 
-  // Optional: Vapi confirmation call to user
-  let confirmationCall = null;
-  if (input.user_phone && handyman) {
-    try {
-      const callResult = await makeVapiCall({
-        handymanId: handyman.id,
-        handymanName: handyman.name,
-        handymanPhone: input.user_phone,
-        purpose: "booking",
-        serviceType: booking.service_type,
-        datetime: booking.datetime,
-        address: booking.address,
-        bookingId: booking.id,
-      });
-      confirmationCall = {
-        call_id: callResult.callId,
-        status: callResult.callStatus,
-      };
-    } catch (err) {
-      console.error("[Vapi] Confirmation call error:", err);
-    }
-  }
-
   const service = booking.service_type.replace(/_/g, " ");
 
   return JSON.stringify({
@@ -134,7 +109,6 @@ export async function bookJob(input: BookJobInput): Promise<string> {
     handyman_rate: booking.price,
     stripe_link: stripeLink,
     stripe_session_id: stripeSessionId,
-    confirmation_call: confirmationCall,
     payment_explanation: [
       `💳 Platform fee: $5 (pay via Stripe link above)`,
       `💰 Handyman rate: $${booking.price} (pay ${handyman?.name ?? "handyman"} directly upon completion)`,
