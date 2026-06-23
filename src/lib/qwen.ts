@@ -9,6 +9,7 @@
 
 import axios from "axios";
 import { config } from "./config.js";
+import { TUKANG_SYSTEM_PROMPT } from "./system-prompt.js";
 
 export interface QwenMessage {
   role: "system" | "user" | "assistant";
@@ -52,14 +53,19 @@ export async function qwenChatCompletion(
   messages: QwenMessage[],
   options?: { model?: string; temperature?: number }
 ): Promise<QwenChatResult> {
+  // Inject Tukang's system prompt unless the caller already supplied one.
+  const fullMessages: QwenMessage[] = messages.some((m) => m.role === "system")
+    ? messages
+    : [{ role: "system", content: TUKANG_SYSTEM_PROMPT }, ...messages];
+
   if (!config.qwen.apiKey) {
-    return simulateChatCompletion(messages);
+    return simulateChatCompletion(fullMessages);
   }
 
   try {
     const res = await qwenClient.post<DashScopeChatResponse>("/chat/completions", {
       model: options?.model ?? config.qwen.model,
-      messages,
+      messages: fullMessages,
       temperature: options?.temperature ?? 0.7,
     });
 
