@@ -160,6 +160,120 @@ const PRICING: Record<string, Record<ComplexityLevel, PricingTier>> = {
       included: ["Whole-home smart system setup", "Multi-ecosystem integration", "Troubleshooting + wiring"],
     },
   },
+  // ─── Automotive ─────────────────────────────────────────────────────────────
+  // SGD ranges exclude parts unless stated; mobile call-outs may add a surcharge.
+  car_servicing: {
+    basic: {
+      min: 80, max: 150, duration_hours: 1,
+      included: ["Engine oil + filter change", "Top-up of fluids", "Basic safety check"],
+    },
+    medium: {
+      min: 180, max: 350, duration_hours: 2,
+      included: ["Major servicing", "Oil, air, fuel & cabin filters", "Spark plugs", "Brake fluid flush"],
+    },
+    complex: {
+      min: 400, max: 800, duration_hours: 4,
+      included: ["Full service + timing belt/water pump", "Transmission fluid", "Coolant flush", "Multi-point inspection"],
+    },
+  },
+  car_brakes: {
+    basic: {
+      min: 100, max: 200, duration_hours: 1,
+      included: ["Front or rear brake pad replacement (1 axle)", "Brake inspection"],
+    },
+    medium: {
+      min: 250, max: 500, duration_hours: 2,
+      included: ["Pads + discs (1 axle)", "Brake fluid change", "Caliper service"],
+    },
+    complex: {
+      min: 550, max: 1200, duration_hours: 4,
+      included: ["Full brake overhaul (all wheels)", "Discs, pads, calipers", "Suspension + alignment check"],
+    },
+  },
+  car_tyres: {
+    basic: {
+      min: 20, max: 60, duration_hours: 1,
+      included: ["Single puncture repair", "Tyre pressure check", "Valve replacement"],
+    },
+    medium: {
+      min: 200, max: 500, duration_hours: 1,
+      included: ["2 tyres supplied + fitted", "Wheel balancing", "Disposal of old tyres"],
+    },
+    complex: {
+      min: 500, max: 1400, duration_hours: 2,
+      included: ["Full set of 4 tyres supplied + fitted", "4-wheel alignment", "Balancing + rotation"],
+    },
+  },
+  car_battery: {
+    basic: {
+      min: 30, max: 80, duration_hours: 1,
+      included: ["Jumpstart / roadside boost", "Battery health test", "Terminal cleaning"],
+    },
+    medium: {
+      min: 150, max: 350, duration_hours: 1,
+      included: ["Battery supplied + replaced", "Charging system check", "Old battery disposal"],
+    },
+    complex: {
+      min: 400, max: 900, duration_hours: 3,
+      included: ["Alternator or starter motor replacement", "Charging system diagnosis", "Wiring repair"],
+    },
+  },
+  car_aircon: {
+    basic: {
+      min: 60, max: 120, duration_hours: 1,
+      included: ["Aircon performance check", "Refrigerant regas (top-up)", "Cabin filter check"],
+    },
+    medium: {
+      min: 150, max: 350, duration_hours: 2,
+      included: ["Full regas + leak test", "Cabin filter replacement", "Condenser cleaning"],
+    },
+    complex: {
+      min: 400, max: 1500, duration_hours: 5,
+      included: ["Compressor replacement", "Condenser / evaporator replacement", "System overhaul"],
+    },
+  },
+  car_diagnostics: {
+    basic: {
+      min: 50, max: 120, duration_hours: 1,
+      included: ["OBD-II fault code scan", "Check-engine light diagnosis", "Written report"],
+    },
+    medium: {
+      min: 150, max: 400, duration_hours: 2,
+      included: ["Electrical fault tracing", "Sensor testing", "ECU readout + minor reset"],
+    },
+    complex: {
+      min: 450, max: 1200, duration_hours: 5,
+      included: ["ECU repair/reprogramming", "Wiring harness repair", "Intermittent fault investigation"],
+    },
+  },
+  car_bodywork: {
+    basic: {
+      min: 100, max: 300, duration_hours: 2,
+      included: ["Scratch / scuff removal", "Minor dent repair (PDR)", "Touch-up paint"],
+    },
+    medium: {
+      min: 350, max: 900, duration_hours: 8,
+      included: ["Panel respray (1-2 panels)", "Dent + paint blending", "Bumper repair"],
+    },
+    complex: {
+      min: 1000, max: 4000, duration_hours: 24,
+      included: ["Full respray", "Accident panel beating", "Structural / chassis straightening"],
+    },
+  },
+  car_towing: {
+    basic: {
+      min: 80, max: 150, duration_hours: 1,
+      included: ["Local tow (within ~15km)", "Standard flatbed/hook", "Roadside assistance"],
+    },
+    medium: {
+      min: 160, max: 300, duration_hours: 2,
+      included: ["Island-wide tow", "Lockout / fuel delivery", "Winch-out (light)"],
+    },
+    complex: {
+      min: 300, max: 700, duration_hours: 3,
+      included: ["Heavy / specialist recovery", "Cross-border (JB) tow", "Accident recovery"],
+    },
+  },
 };
 
 // ─── Tool 6: quote_job ────────────────────────────────────────────────────────
