@@ -19,6 +19,9 @@ export const config = {
     phoneNumberId: optional("WHATSAPP_PHONE_NUMBER_ID"),
     verifyToken: optional("WHATSAPP_VERIFY_TOKEN", "tukang-verify"),
     baseUrl: "https://graph.facebook.com/v19.0",
+    // Pre-approved utility template used for cold contractor outreach.
+    outreachTemplate: optional("WHATSAPP_OUTREACH_TEMPLATE", "tukang_quote_request"),
+    outreachTemplateLang: optional("WHATSAPP_OUTREACH_TEMPLATE_LANG", "en"),
   },
 
   stripe: {
@@ -32,5 +35,11 @@ export const config = {
     apiKey: optional("QWEN_API_KEY"),
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     model: optional("QWEN_MODEL", "qwen-max"),
+  },
+
+  exa: {
+    apiKey: optional("EXA_API_KEY"),
+    // Search type: auto (balanced), fast, instant, deep-lite, deep, deep-reasoning
+    searchType: optional("EXA_SEARCH_TYPE", "auto"),
   },
 } as const;

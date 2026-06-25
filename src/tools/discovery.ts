@@ -6,9 +6,12 @@
  */
 
 import { z } from "zod";
-import { queryAll, queryOne } from "../db/database.js";
+import { randomUUID } from "crypto";
+import { queryAll, queryOne, execute } from "../db/database.js";
 import { getPreferences } from "../lib/mem0.js";
+import { discoverServices } from "../lib/exa.js";
 import { SERVICE_TYPES } from "../lib/service-types.js";
+import { contactForOutput, isContactUnlocked } from "../lib/contact.js";
 
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 
@@ -162,8 +165,11 @@ export async function getHandymanProfile(
   return JSON.stringify({
     id: handyman.id,
     name: handyman.name,
-    phone: handyman.phone,
-    whatsapp: handyman.whatsapp,
+    // Contact is gated: masked until the $5 platform fee is paid for this
+    // contractor. Real number is resolved server-side for outreach — see
+    // lib/contact.ts. Do NOT add raw phone/whatsapp back to this output.
+    contact: contactForOutput(handyman.id, handyman.whatsapp ?? handyman.phone),
+    contact_unlocked: isContactUnlocked(handyman.id),
     service_types: JSON.parse(handyman.service_types) as string[],
     location: handyman.location,
     bio: handyman.bio,
@@ -258,6 +264,104 @@ export async function compareHandymanPrices(
       trust_score: h.trust_score,
       acra_status: h.acra_status,
     })),
+  });
+}
+
+// ─── Tool: discover_services_web ──────────────────────────────────────────────
+// Live web discovery of real providers via Exa. Unlike search_handymen (seeded
+// DB only), this finds contractors on the open web and normalizes them into the
+// same shape, tagged source:"web" + unverified, so the outreach flow can still
+// WhatsApp them but the UI can distinguish vetted vs discovered leads.
+
+export const discoverServicesWebSchema = z.object({
+  service_type: z
+    .enum(SERVICE_TYPES)
+    .describe("Type of service to search the web for."),
+  location: z
+    .string()
+    .optional()
+    .describe("Area/city to search within (e.g. Tampines, Singapore). Auto-filled from Mem0 if omitted."),
+  num_results: z
+    .number()
+    .int()
+    .min(1)
+    .max(15)
+    .optional()
+    .default(10)
+    .describe("How many web providers to retrieve."),
+  user_id: z
+    .string()
+    .optional()
+    .describe("User ID for Mem0 location auto-fill."),
+});
+
+export type DiscoverServicesWebInput = z.infer<typeof discoverServicesWebSchema>;
+
+export async function discoverServicesWeb(
+  input: DiscoverServicesWebInput
+): Promise<string> {
+  let location = input.location;
+  if (!location && input.user_id) {
+    const prefs = await getPreferences(input.user_id);
+    if (prefs.address) location = prefs.address;
+  }
+
+  const result = await discoverServices({
+    serviceType: input.service_type,
+    location,
+    numResults: input.num_results,
+  });
+
+  const handymen = result.providers.map((p) => {
+    const id = `web_${randomUUID().slice(0, 8)}`;
+    // Persist the lead server-side so its number never lives on the client.
+    // The output below masks it; outreach + booking resolve it by id, and it is
+    // only unmasked once the platform fee is paid — same gate as curated supply.
+    execute(
+      `INSERT INTO web_leads (id, name, phone, website, area, service_type, price_hint, source_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        p.name,
+        p.phone ?? null,
+        p.website ?? null,
+        p.area ?? location ?? null,
+        input.service_type,
+        p.price_hint ?? null,
+        p.source_url ?? null,
+      ]
+    );
+    return {
+      id,
+      name: p.name,
+      location: p.area ?? location ?? "Singapore",
+      rating: null,
+      bookings: null,
+      price_min: null,
+      price_max: null,
+      price_hint: p.price_hint,
+      trust_score: null,
+      acra_status: "unverified",
+      service_types: [input.service_type],
+      // Masked until the $5 fee is paid — never the raw number, web or not.
+      contact: contactForOutput(id, p.phone),
+      contact_unlocked: isContactUnlocked(id),
+      has_phone: Boolean(p.phone),
+      website: p.website,
+      source: "web" as const,
+      source_url: p.source_url,
+      available_times: [],
+    };
+  });
+
+  return JSON.stringify({
+    service_type: input.service_type,
+    location_filter: location ?? "Singapore",
+    source: result.simulated ? "exa-simulated" : "exa-web",
+    total_found: handymen.length,
+    note: "Web-discovered leads are unverified — confirm details before booking. Their contact is masked; reach them with whatsapp_multiple_handymen using the id (the number is resolved server-side and revealed only after the platform fee is paid).",
+    query_used: result.query,
+    handymen,
   });
 }
 

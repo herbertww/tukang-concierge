@@ -11,6 +11,7 @@ import {
   sendRejectionNotice,
 } from "../lib/whatsapp.js";
 import { createServiceFeeCheckout } from "../lib/stripe.js";
+import { contactForOutput, resolveHandymanPhone, resolveProvider } from "../lib/contact.js";
 import { v4 as uuidv4 } from "uuid";
 
 // ─── Tool 9: present_bid_results ──────────────────────────────────────────────
@@ -86,7 +87,8 @@ export async function presentBidResults(
     rating?: number;
     trust_score?: number;
     response_time_seconds?: number;
-    whatsapp?: string | null;
+    // Real number, held internally only for the reveal gate — never emitted raw.
+    phone?: string | null;
   }> = [];
 
   // ── Auto-fetch from DB if session_id provided ──────────────────────────────
@@ -103,14 +105,16 @@ export async function presentBidResults(
       );
       return {
         handyman_id: q.handyman_id,
-        name: handyman?.name ?? q.handyman_phone,
+        // Names are not sensitive; resolve curated OR web. Never fall back to
+        // the raw phone as a display name — that would leak it.
+        name: handyman?.name ?? resolveProvider(q.handyman_id)?.name ?? `Contractor ${q.handyman_id}`,
         call_status: q.available ? "success" : "unavailable",
         availability: q.available === 1,
         price_quoted: q.price_quoted,
         datetime_offered: q.datetime_offered,
         rating: handyman?.rating,
         trust_score: handyman?.trust_score,
-        whatsapp: handyman?.whatsapp ?? q.handyman_phone,
+        phone: handyman?.whatsapp ?? q.handyman_phone,
       };
     });
   } else if (input.call_results?.length) {
@@ -118,6 +122,7 @@ export async function presentBidResults(
     results = input.call_results.map((r) => ({
       ...r,
       availability: r.availability,
+      phone: r.whatsapp,
     }));
   } else {
     return JSON.stringify({
@@ -181,7 +186,8 @@ ${cheapest ? `💬 Reply "Book ${cheapest.name}" to accept cheapest ($${cheapest
           name: cheapest.name,
           price: cheapest.price_quoted,
           datetime: cheapest.datetime_offered,
-          whatsapp: cheapest.whatsapp,
+          // Masked until the platform fee is paid — see lib/contact.ts.
+          contact: contactForOutput(cheapest.handyman_id, cheapest.phone ?? null),
         }
       : null,
     all_available: available.map((r, i) => ({
@@ -191,7 +197,7 @@ ${cheapest ? `💬 Reply "Book ${cheapest.name}" to accept cheapest ($${cheapest
       price: r.price_quoted,
       datetime: r.datetime_offered,
       rating: r.rating,
-      whatsapp: r.whatsapp,
+      contact: contactForOutput(r.handyman_id, r.phone ?? null),
     })),
   });
 }
@@ -207,6 +213,10 @@ export const acceptWinningBidSchema = z.object({
     service_type: z.string().describe("Service type."),
   }),
   user_id: z.string().optional().describe("User ID for Stripe metadata."),
+  user_phone: z
+    .string()
+    .optional()
+    .describe("Customer's WhatsApp number (E.164). Shared with the contractor only AFTER the $5 fee is paid so the two can coordinate directly."),
   runner_up_handymen: z
     .array(
       z.object({
@@ -221,20 +231,11 @@ export const acceptWinningBidSchema = z.object({
 
 export type AcceptWinningBidInput = z.infer<typeof acceptWinningBidSchema>;
 
-interface HandymanRowFull {
-  id: string;
-  name: string;
-  phone: string;
-  whatsapp: string | null;
-}
-
 export async function acceptWinningBid(
   input: AcceptWinningBidInput
 ): Promise<string> {
-  const handyman = queryOne<HandymanRowFull>(
-    "SELECT id, name, phone, whatsapp FROM handymen WHERE id = ?",
-    [input.handyman_id]
-  );
+  // Resolve curated OR web lead — both bookable, both gated identically.
+  const handyman = resolveProvider(input.handyman_id);
 
   if (!handyman) {
     return JSON.stringify({ error: `Handyman ${input.handyman_id} not found.` });
@@ -244,8 +245,8 @@ export async function acceptWinningBid(
   const userId = input.user_id ?? "default_user";
 
   execute(
-    `INSERT INTO bookings (id, user_id, handyman_id, service_type, address, datetime, price, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    `INSERT INTO bookings (id, user_id, handyman_id, service_type, address, datetime, price, status, user_phone)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
     [
       bookingId,
       userId,
@@ -254,10 +255,11 @@ export async function acceptWinningBid(
       input.booking_details.address,
       input.booking_details.datetime,
       input.booking_details.price,
+      input.user_phone ?? null,
     ]
   );
 
-  const waPhone = handyman.whatsapp ?? handyman.phone;
+  const waPhone = handyman.phone;
   const waResult = await sendAcceptanceNotification({
     handymanName: handyman.name,
     handymanPhone: waPhone,
@@ -270,7 +272,9 @@ export async function acceptWinningBid(
 
   if (input.runner_up_handymen?.length) {
     for (const ru of input.runner_up_handymen) {
-      const ruPhone = ru.whatsapp ?? "";
+      // Resolve the runner-up's number server-side; the client no longer holds
+      // contractor numbers. Fall back to a passed number only for web leads.
+      const ruPhone = resolveHandymanPhone(ru.handyman_id) ?? ru.whatsapp ?? "";
       if (ruPhone) {
         await sendRejectionNotice(ru.name, ruPhone, bookingId);
       }
@@ -299,7 +303,9 @@ export async function acceptWinningBid(
   return JSON.stringify({
     booking_id: bookingId,
     status: "pending_acceptance",
-    handyman: { id: handyman.id, name: handyman.name, whatsapp: waPhone },
+    // Number stays masked until the $5 fee is paid (Stripe webhook). It is sent
+    // to the contractor server-side above regardless — see lib/contact.ts.
+    handyman: { id: handyman.id, name: handyman.name, contact: contactForOutput(handyman.id, waPhone) },
     whatsapp_sent: waResult.success,
     whatsapp_message_id: waResult.messageId,
     stripe_payment_link: stripeLink,

@@ -1,212 +1,94 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code working in this repo. These instructions OVERRIDE default behavior.
 
-## What This Project Is
+## What This Is
 
-**Tukang** is a Singapore-based home services booking platform delivered as an MCP (Model Context Protocol) server. Users chat with an AI (via any MCP-compatible client) to book handymen, plumbers, electricians, cleaners, etc. The AI uses Tukang's 15 MCP tools to search contractors, send WhatsApp quotes to multiple contractors in parallel, collect bids, and finalise bookings with Stripe payment.
+**Tukang** — a Singapore home-services booking platform delivered as an **MCP server**. Users chat with an AI (any MCP client) to book handymen, plumbers, electricians, cleaners, etc. 16 MCP tools search contractors, WhatsApp quotes to several contractors in parallel, collect bids, and finalise with Stripe.
 
-**Repo:** https://github.com/herbertww/tukang-concierge
-**Language:** TypeScript / Node.js (ESM, `"type": "module"`)
-**Transport:** MCP over HTTP (Streamable), port 8000
-**Database:** SQLite (file: `tukang.db`)
-**Market:** Singapore primary, Malaysian contractors accepted
+- **Repo:** https://github.com/herbertww/tukang-concierge
+- **Stack:** TypeScript/Node ESM (`"type": "module"`) · MCP over HTTP (Streamable), port 8000 · SQLite via **sql.js** (file `tukang.db`) · Mem0 (memory) · WhatsApp Business API (outreach) · Stripe ($5 fee) · Qwen Cloud/DashScope (LLM) · Exa (live web discovery of providers) · deploy target Alibaba Cloud ECS
+- **Market:** Singapore primary; Malaysian contractors accepted.
 
----
+## Vision & Strategy
 
-## Environment Variable Management
+- **Ultimate goal:** replace manual listings directories (Craigslist, Carousell, classifieds) with a conversational, agent-native marketplace. Handymen booking is the wedge; long-term target is **all local services**.
+- **Distribution:** be a ready-made MCP connector for when MCP "app"/connector marketplaces land in popular AI chat (Claude, ChatGPT) — discoverable and one-click usable the moment they exist.
+- **Cost model:** lean on the **user's own AI compute subscription** to crawl/discover services on demand — supply discovery runs on their dime, not ours. Keep our server thin: matching, outreach, bids, payment.
+- **Hackathon exception:** for the Qwen hackathon we must run on **Alibaba Cloud ECS** and use **Qwen Cloud (DashScope)** as the LLM. Requirement, not the permanent architecture.
 
-**You are the permanent manager of `.env` for this project.**
+## `.env` — You Are Its Manager
 
-Rules you must follow at all times:
-- `.env` lives at the project root. Create it if it does not exist.
-- When the user gives you a key/value, immediately write it to `.env`
-- When the user says "update X to Y", update that line in `.env`
-- When the user asks "what keys are missing", read `.env` and list blanks
-- **NEVER commit `.env` to git** — it is in `.gitignore`
-- **NEVER print full secret values in your responses** — confirm with "✅ MEM0_API_KEY updated" not the actual value
-- **NEVER hardcode secrets** in any source file — always use `process.env.KEY_NAME`
-- If you need to show a key for verification, show only the last 4 characters: `...O7JX`
+`.env` lives at project root (in `.gitignore`). Write keys the moment the user gives them; handle "update X to Y" and "what's missing" (list blanks). **Never** commit `.env`, print full secret values (confirm with `✅ KEY updated`, or show last 4 chars `...O7JX`), or hardcode secrets — always `process.env.KEY`.
 
-Required keys (from `.env.example`):
-```
-PORT=8000
-NODE_ENV=development
-DB_PATH=./tukang.db
-MEM0_API_KEY=
-WHATSAPP_TOKEN=
-WHATSAPP_PHONE_NUMBER_ID=
-WHATSAPP_VERIFY_TOKEN=
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-STRIPE_SERVICE_FEE_PRICE_ID=
-PUBLIC_URL=
-QWEN_API_KEY=
-```
+Required keys: `PORT NODE_ENV DB_PATH MEM0_API_KEY WHATSAPP_TOKEN WHATSAPP_PHONE_NUMBER_ID WHATSAPP_VERIFY_TOKEN STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_SERVICE_FEE_PRICE_ID PUBLIC_URL QWEN_API_KEY EXA_API_KEY` (+ optional `EXA_SEARCH_TYPE`).
 
-Every external client (`src/lib/mem0.ts`, `whatsapp.ts`, `stripe.ts`, `qwen.ts`) degrades to a **simulated/dev-mode response** when its API key is missing, instead of throwing — e.g. `sendWhatsAppMessage` logs `[WhatsApp SIM]` and returns a fake message ID, `qwenChatCompletion` returns a `[Qwen Cloud not configured]` placeholder. This means the server runs end-to-end with an empty `.env`; missing keys silently degrade behavior rather than crashing, so don't assume a feature is broken just because nothing visibly fails.
+Every external client (`mem0.ts`, `whatsapp.ts`, `stripe.ts`, `qwen.ts`, `exa.ts`) **degrades to a simulated dev response when its key is missing** instead of throwing — the server runs end-to-end with an empty `.env`. Missing keys degrade silently; don't assume a feature is broken just because nothing fails visibly.
 
----
-
-## Current Stack
-
-| Layer | Technology |
-|---|---|
-| MCP Server | `@modelcontextprotocol/sdk` |
-| Language | TypeScript (compiled to `dist/`) |
-| Database | SQLite (`sql.js` driver — NOT `better-sqlite3`) |
-| Memory | Mem0 (`mem0ai` REST API via `axios`) |
-| Contractor Outreach | WhatsApp Business API (Meta) |
-| Payments | Stripe Checkout ($5 platform fee) |
-| LLM | Qwen Cloud / DashScope (`src/lib/qwen.ts`) |
-| Deployment target | Alibaba Cloud ECS |
-
-**Vapi has been permanently removed.** Do not reintroduce it. (Contractor outreach is WhatsApp-only — see `src/tools/calling.ts`.)
-
----
-
-## Source Structure
+## Source Layout (`src/` is the only live code)
 
 ```
-tukang/
-├── CLAUDE.md
-├── LICENSE                   # MIT
-├── .env                      # secrets, never commit
-├── .env.example               # template, safe to commit
-├── src/
-│   ├── index.ts              # MCP server entry, Express app, MCP transport/session handling,
-│   │                          # WhatsApp inbound webhook + reply parser, Stripe webhook
-│   ├── db/
-│   │   ├── database.ts       # sql.js init, migrations, execute(), queryOne(), queryAll()
-│   │   └── seed.ts           # `npm run seed` — idempotent demo data (8 SG handymen + reviews)
-│   ├── lib/
-│   │   ├── config.ts         # Typed env var loader (single `config` object, all other files import this)
-│   │   ├── mem0.ts           # Mem0 REST client — regex-parses free-text memories into UserPreferences
-│   │   ├── whatsapp.ts       # sendWhatsAppMessage() + templated notifications via Meta Cloud API
-│   │   ├── stripe.ts         # Stripe Checkout session creation + webhook signature verification
-│   │   └── qwen.ts           # Qwen Cloud DashScope client — hackathon proof-of-Alibaba-Cloud-usage file
-│   └── tools/                # One file per MCP tool category; each exports a zod schema + handler
-│       ├── preferences.ts    # get/update_saved_preferences (Mem0)
-│       ├── discovery.ts      # search_handymen, get_handyman_profile, compare_handyman_prices
-│       ├── quoting.ts        # quote_job (static pricing matrix, no DB)
-│       ├── calling.ts        # whatsapp_handyman, whatsapp_multiple_handymen
-│       ├── bids.ts           # present_bid_results, accept_winning_bid
-│       ├── booking.ts        # book_job, notify_arrival
-│       └── registration.ts   # register_provider, submit_provider_review, get_provider_reviews
-├── dist/                      # tsc build output — do not edit directly
-└── assets/                    # ⚠️ STALE LEGACY DUMP — see warning below
+src/index.ts          MCP server, Express app, session/transport handling,
+                      WhatsApp inbound webhook + regex reply parser, Stripe webhook
+src/db/database.ts    sql.js init, migrations, execute()/queryOne()/queryAll()
+src/db/seed.ts        `npm run seed` — idempotent demo data
+src/lib/config.ts     typed env loader (single `config` object; all files import this)
+src/lib/{mem0,whatsapp,stripe,qwen,exa}.ts   external clients (all degrade w/o keys)
+src/lib/contact.ts    contact-disclosure gate: maskPhone / isContactUnlocked / resolveProvider / resolveHandymanPhone / contactForOutput
+src/tools/*.ts        one file per tool category: zod schema + async handler → JSON string
 ```
 
-### ⚠️ `assets/` is not part of the active build
+⚠️ **`assets/` is a frozen legacy dump** — its own package.json, a parallel src tree, a React frontend, and a stale `vapi.ts`. Nothing in it is imported or runs. Never treat it as live code or a reference for current behavior.
 
-`assets/` is a frozen snapshot of an earlier project iteration — it contains its own `package.json`, `tsconfig.json`, `.env.example`, an entire parallel `src`-like tree (`mcp.ts`, `db.ts`, `vapi.ts`, `oauth-compat.ts`, `routers.ts`, `useAuth.ts`), a React frontend (`Home.tsx`, `Register.tsx`, `AdminProviders.tsx`, `App.tsx`), design notes, a `todo.md`, video assets, and a zipped server bundle. None of it is imported by `src/` and none of it runs. Notably it still contains `vapi.ts` — **do not mistake this for live code or use it as a reference for current behavior.** The real, current source is exclusively under `src/`. If you need a logo or diagram, check there first, but verify relevance before trusting anything else in that folder.
+## Architecture Gotchas (load-bearing)
 
----
-
-## Architecture Notes
-
-- **ESM relative imports require explicit `.js` extensions**, even though every source file is `.ts` (e.g. `import { config } from "../lib/config.js"` inside `config.ts` itself doesn't exist, but every cross-file import does this). This is required by `"type": "module"` + `moduleResolution: "bundler"` + running via `tsx`/compiled `node`. Forgetting the `.js` suffix on a new relative import will fail at runtime even though `tsc` may not complain.
-- **MCP session handling** (`src/index.ts`): a single Express app serves `/mcp` (POST/GET/DELETE). Each new `mcp-session-id` gets its own `StreamableHTTPServerTransport` and its own freshly constructed `McpServer` (via `createMcpServer()`), stored in an in-memory `Map<sessionId, transport>`. There is no shared server instance across sessions — tool registration runs once per session on first connect.
-- **Adding a new MCP tool**: create a file under `src/tools/` exporting a zod schema (`xSchema`) and an async handler returning `Promise<string>` (a JSON-stringified payload), then register it in `createMcpServer()` in `index.ts` via `server.tool(name, description, xSchema.shape, handler)`. Update the tool count in the `/health` route and the startup banner if you add/remove tools.
-- **Database persistence model** (`src/db/database.ts`): `sql.js` keeps the entire DB in memory; every `execute()` call triggers `persist()`, which does a full `db.export()` + `fs.writeFileSync` of the whole file. There's no WAL, no transactions, and no concurrency control — fine for demo/single-process use, but don't assume Postgres/`better-sqlite3` semantics (row-level locking, partial writes, etc.).
-- **WhatsApp inbound replies are parsed with regex, not an LLM call.** `parsePrice()`, `parseAvailability()`, `parseDatetime()` in `index.ts` heuristically extract price/availability/datetime from a contractor's free-text WhatsApp reply and upsert into `handyman_quotes`. A reply is matched to the contractor's **most recent** open `session_id` (`ORDER BY received_at DESC LIMIT 1`) — if a contractor is outreached twice concurrently, the newer session wins.
-- **Known inconsistency — Stripe currency:** `src/lib/stripe.ts`'s `createServiceFeeCheckout()` hardcodes `currency: "usd"` in the Checkout Session, while every other tool (`quote_job`, `get_handyman_profile`, `compare_handyman_prices`) reports prices in `"SGD"` and the docs/messaging describe a "$5 SGD platform fee". Be aware of this mismatch if you touch payment code — fixing it (e.g. to `"sgd"`) is a real, not cosmetic, change.
-- **No automated test suite currently exists** in `src/` (no `test` script in `package.json`). `assets/mcp.test.ts` is part of the legacy dump above and is not wired into any runner.
-
----
+- **ESM relative imports need explicit `.js`** even though sources are `.ts` (e.g. `import { config } from "../lib/config.js"`). Omitting it fails at runtime even if `tsc` is silent.
+- **Per-session servers:** each `mcp-session-id` gets its own `StreamableHTTPServerTransport` + freshly built `McpServer` (`createMcpServer()`), stored in an in-memory `Map`. No shared instance; tool registration runs once per session.
+- **Adding a tool:** export `xSchema` (zod) + async handler returning `Promise<string>` under `src/tools/`, register in `createMcpServer()` via `server.tool(name, desc, xSchema.shape, handler)`, and update the tool count in `/health` + startup banner.
+- **Contact number = the product, never in output pre-payment — ANY source:** the $5 fee sells the introduction, so a provider's phone/WhatsApp must NOT appear in any tool output until the fee is paid — **curated directory and live web leads are gated identically.** Finding the number is the service; the user never leaves AI chat to get it. Every user-facing tool routes contact through `contactForOutput(id, realPhone)` in `src/lib/contact.ts` (real number once `bookings.payment_status='paid'`, else a `+65 •••• 4567` mask). Web leads from `discover_services_web` are persisted to the `web_leads` table with a generated `web_*` id and their phone stored server-side; `resolveProvider(id)` resolves curated **or** web leads, so outreach/booking work by id and the number never crosses the wire to the client. Names are not sensitive; never fall back to a raw phone as a display name.
+- **DB persistence:** sql.js holds the whole DB in memory; every `execute()` does a full `db.export()` + `writeFileSync`. No WAL, transactions, or concurrency control — don't assume Postgres/better-sqlite3 semantics.
+- **WhatsApp inbound parsed by regex, not LLM:** `parsePrice()/parseAvailability()/parseDatetime()` in `index.ts` extract fields into `handyman_quotes`. A reply matches the contractor's **most recent** open `session_id` (`ORDER BY received_at DESC LIMIT 1`) — concurrent outreach: newer session wins.
+- **Stripe currency bug:** `createServiceFeeCheckout()` hardcodes `currency: "usd"` while everything else reports/charges **SGD** ("$5 SGD fee"). Real mismatch — fixing to `"sgd"` is a substantive change.
+- **Currency parsing:** SGD patterns (`SGD`, `S$`, `$`, `dollars`) checked first; RM/MYR secondary. All outgoing WhatsApp requests quotes in SGD.
+- **No test suite** in `src/` (`assets/mcp.test.ts` is legacy, not wired up).
 
 ## The 15 MCP Tools
 
-| Category | Tool | Purpose |
-|---|---|---|
-| A — Memory | `get_saved_preferences` | Fetch user saved address, budget, preferred contractors from Mem0 |
-| A — Memory | `update_saved_preferences` | Save/update user preferences in Mem0 |
-| B — Discovery | `search_handymen` | Find contractors by service, location, budget |
-| B — Discovery | `get_handyman_profile` | Full profile + 5 recent reviews + trust score |
-| B — Discovery | `compare_handyman_prices` | Price comparison table across contractors |
-| C — Quoting | `quote_job` | Estimated price range by service + complexity (static matrix, no DB lookup) |
-| D — Outreach | `whatsapp_handyman` | WhatsApp one contractor for availability/price |
-| D — Outreach | `whatsapp_multiple_handymen` | WhatsApp 1–5 contractors in parallel |
-| E — Bids | `present_bid_results` | Show live bid table from DB by session_id |
-| E — Bids | `accept_winning_bid` | Confirm winner, reject others, generate Stripe link |
-| F — Booking | `book_job` | Finalise booking, generate Stripe checkout |
-| F — Booking | `notify_arrival` | WhatsApp user when contractor is en route / at door |
-| G — Registration | `register_provider` | Handyman self-registration |
-| G — Registration | `submit_provider_review` | Submit star rating after job, recalculates average rating |
-| G — Registration | `get_provider_reviews` | Fetch all reviews for a provider |
+- **Memory (Mem0):** `get_saved_preferences`, `update_saved_preferences`
+- **Discovery:** `search_handymen` (seeded DB), `get_handyman_profile` (profile + 5 reviews + trust score; contact masked until paid), `compare_handyman_prices`, `discover_services_web` (live Exa web search → unverified leads, `source:"web"`, normalized to `search_handymen` shape, persisted to `web_leads` with a `web_*` id, contact masked until paid)
+- **Quoting:** `quote_job` (static pricing matrix, no DB)
+- **Outreach (WhatsApp):** `whatsapp_handyman`, `whatsapp_multiple_handymen` (1–5 parallel → `session_id`)
+- **Bids:** `present_bid_results` (live table by session_id), `accept_winning_bid` (pick winner, reject rest, Stripe link)
+- **Booking:** `book_job` (finalise + Stripe checkout), `notify_arrival`
+- **Registration:** `register_provider`, `submit_provider_review` (recalcs avg rating), `get_provider_reviews`
 
----
+## Booking Flow
 
-## Hackathon: Qwen Cloud Global Hackathon
-
-**Deadline:** July 9, 2026
-**Track:** Track 4 — Autopilot Agent
-**Submission repo must be:** public, MIT licensed, with license visible in GitHub About section
-
-### Remaining To-Do
-
-- [ ] Deploy to Alibaba Cloud ECS
-- [ ] Configure all `.env` vars on ECS server
-- [ ] Point WhatsApp webhook to ECS public domain
-- [ ] Commit architecture diagram to `assets/architecture.png`
-- [ ] Record 3-minute demo video → upload to YouTube
-- [ ] Submit at hackathon portal
-
-### Alibaba Cloud Requirements
-- Backend must run on Alibaba Cloud ECS
-- `src/lib/qwen.ts` is the proof-of-Alibaba-Cloud-usage file — link this in the submission
-- LLM must be Qwen Cloud (DashScope). Base URL: `https://dashscope.aliyuncs.com/compatible-mode/v1`, model: `qwen-max`
-
----
-
-## Currency
-
-- **Primary:** SGD — patterns: `SGD`, `S$`, `$`, `dollars`
-- **Secondary:** RM / MYR — Malaysian contractors accepted
-- `parsePrice()` in `src/index.ts` checks SGD patterns first
-- All outgoing WhatsApp messages request quotes in SGD
-- Stripe checkout currently charges in USD, not SGD — see Architecture Notes above
-
----
-
-## Key Booking Flow
-
-1. User describes job in chat
-2. LLM → `get_saved_preferences` (fills address/budget from Mem0)
-3. LLM → `search_handymen` (ranked contractor list)
-4. LLM → `whatsapp_multiple_handymen` (2–5 contractors messaged simultaneously → returns `session_id`)
-5. Contractor replies hit `POST /webhooks/whatsapp` → parsed into `handyman_quotes` table
-6. LLM → `present_bid_results` (session_id) → live bid table shown to user
-7. User picks winner → LLM → `accept_winning_bid` → Stripe link generated
-8. User pays $5 platform fee → Stripe webhook → booking `confirmed`
-9. Job day → `notify_arrival` → WhatsApp update to user
-
----
+chat → `get_saved_preferences` → `search_handymen` → `whatsapp_multiple_handymen` (→ session_id) → contractor replies hit `POST /webhooks/whatsapp` (regex → `handyman_quotes`) → `present_bid_results` → user picks → `accept_winning_bid` (Stripe link) → user pays $5 → Stripe webhook → booking `confirmed` → job day `notify_arrival`.
 
 ## Build & Run
 
-```bash
-npm install
-npm run build       # tsc → dist/
-npm start           # node dist/index.js
-npm run dev         # tsx watch src/index.ts
-npm run seed        # populate tukang.db with demo handymen + reviews (skips if already seeded)
-npm run lint        # tsc --noEmit
 ```
+npm install
+npm run build   # tsc → dist/
+npm start       # node dist/index.js
+npm run dev     # tsx watch src/index.ts
+npm run seed    # demo handymen + reviews (idempotent)
+npm run lint    # tsc --noEmit
+```
+Endpoints: `GET /health` · `POST /mcp` · `POST /webhooks/whatsapp` · `POST /webhooks/stripe`
 
-Health check: `GET /health`
-MCP endpoint: `POST /mcp`
-WhatsApp webhook: `POST /webhooks/whatsapp`
-Stripe webhook: `POST /webhooks/stripe`
+## Hackathon (Qwen Cloud Global, Track 4 — Autopilot Agent, due 2026-07-09)
 
----
+Submission repo must be public + MIT (license visible in GitHub About). Backend on Alibaba Cloud ECS; LLM = Qwen Cloud/DashScope (`https://dashscope.aliyuncs.com/compatible-mode/v1`, model `qwen-max`); `src/lib/qwen.ts` is the proof-of-Alibaba-usage file to link.
+Remaining: deploy to ECS · set `.env` on ECS · point WhatsApp webhook at ECS domain · commit `assets/architecture.png` · record 3-min demo → YouTube · submit at portal.
 
 ## Hard Rules
 
-- Do NOT reintroduce Vapi or any voice calling library
-- Do NOT commit `.env` to git
-- Do NOT use OpenAI or Anthropic as the LLM — must be Qwen Cloud for hackathon
-- Do NOT rename MCP tools or change input schemas without updating all callers
-- Do NOT switch from SQLite without rewriting `src/db/database.ts`
-- Do NOT print or log full secret key values anywhere
-- Do NOT treat anything under `assets/` as live/current code
+- Do NOT reintroduce **Vapi** or any voice-calling lib (outreach is WhatsApp-only).
+- Do NOT use **OpenAI or Anthropic** as the LLM — must be Qwen Cloud.
+- Do NOT commit `.env`, or print/log full secret values.
+- Do NOT rename MCP tools or change input schemas without updating all callers + counts.
+- Do NOT switch off SQLite/sql.js without rewriting `src/db/database.ts`.
+- Do NOT treat anything under `assets/` as live code.
+- Do NOT emit any provider's raw phone/WhatsApp in any tool output before the fee is paid — **curated OR web, no exceptions** — always go through `contactForOutput` (see Architecture Gotchas). Don't add `phone`/`whatsapp` back to `get_handyman_profile`, `present_bid_results`, `accept_winning_bid`, `book_job`, or `discover_services_web`, and don't make outreach take a raw number for any provider. New tools that surface a provider must reuse `contactForOutput`/`resolveProvider`.

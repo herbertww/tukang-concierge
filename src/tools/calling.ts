@@ -18,15 +18,17 @@
 
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { sendWhatsAppMessage } from "../lib/whatsapp.js";
+import { sendWhatsAppTemplate } from "../lib/whatsapp.js";
 import { execute, queryOne } from "../db/database.js";
+import { resolveHandymanPhone } from "../lib/contact.js";
+import { config } from "../lib/config.js";
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 export const whatsappHandymanSchema = z.object({
-  handyman_id: z.string().describe("Handyman ID from the database"),
-  handyman_name: z.string().describe("Handyman's name"),
-  handyman_phone: z.string().describe("Handyman's WhatsApp number in E.164 format (e.g. +6591234567)"),
+  handyman_id: z.string().describe("Handyman ID from search results. The number is resolved server-side from this — you do NOT need to supply it."),
+  handyman_name: z.string().describe("Handyman's name (for the message greeting)"),
+  handyman_phone: z.string().optional().describe("ONLY for unverified web leads (web_* ids) that aren't in the directory. Ignored for directory contractors — their number is looked up server-side."),
   service_type: z.string().describe("Type of service needed (e.g. plumbing, electrical)"),
   address: z.string().optional().describe("Job location address"),
   datetime: z.string().optional().describe("Preferred datetime (e.g. Saturday 10am)"),
@@ -38,9 +40,9 @@ export const whatsappMultipleHandymenSchema = z.object({
   handymen: z
     .array(
       z.object({
-        handyman_id: z.string(),
+        handyman_id: z.string().describe("ID from search results; number resolved server-side."),
         handyman_name: z.string(),
-        handyman_phone: z.string(),
+        handyman_phone: z.string().optional().describe("ONLY for unverified web leads (web_* ids) not in the directory."),
       })
     )
     .min(1)
@@ -90,26 +92,62 @@ function buildOutreachMessage(params: {
   return lines.join("\n");
 }
 
+/**
+ * Build the ordered body params for the approved utility template
+ * `tukang_quote_request`: {{1}}=name, {{2}}=service, {{3}}=job details line.
+ * Each param is collapsed to a single clean line — Meta rejects params with
+ * newlines, tabs, or 5+ consecutive spaces, and every {{n}} must be non-empty.
+ */
+function buildOutreachParams(params: {
+  handymanName: string;
+  serviceType: string;
+  address?: string;
+  datetime?: string;
+  maxBudget?: number;
+}): string[] {
+  const service = params.serviceType.replace(/_/g, " ");
+  const bits: string[] = [];
+  if (params.address) bits.push(`Location: ${params.address}`);
+  if (params.datetime) bits.push(`Preferred time: ${params.datetime}`);
+  if (params.maxBudget) bits.push(`Budget up to SGD ${params.maxBudget}`);
+  const details = bits.length ? bits.join(" · ") : "Details to be confirmed with the customer.";
+
+  const clean = (s: string) => s.replace(/\s+/g, " ").trim();
+  return [clean(params.handymanName), clean(service), clean(details)];
+}
+
 // ─── Single Handyman Outreach ─────────────────────────────────────────────────
 
 export async function whatsappHandyman(
   args: z.infer<typeof whatsappHandymanSchema>
 ): Promise<string> {
   const sessionId = args.session_id ?? randomUUID();
-  const message = buildOutreachMessage({
-    handymanName: args.handyman_name,
-    serviceType: args.service_type,
-    address: args.address,
-    datetime: args.datetime,
-    maxBudget: args.max_budget,
-  });
+  const outreach = { handymanName: args.handyman_name, serviceType: args.service_type, address: args.address, datetime: args.datetime, maxBudget: args.max_budget };
+  // Human-readable preview for the UI; the wire message is the approved template.
+  const message = buildOutreachMessage(outreach);
+  const templateParams = buildOutreachParams(outreach);
+
+  // Resolve the real number server-side. Directory contractors are looked up by
+  // id (client never sees the number); a passed phone is only honoured for web
+  // leads that aren't in the directory. See lib/contact.ts.
+  const phone = resolveHandymanPhone(args.handyman_id) ?? args.handyman_phone;
 
   let sendStatus = "sent";
-  try {
-    await sendWhatsAppMessage(args.handyman_phone, message);
-  } catch (err) {
-    console.error(`[WhatsApp Outreach] Failed to message ${args.handyman_name}:`, err);
+  if (!phone) {
     sendStatus = "failed";
+    console.error(`[WhatsApp Outreach] No number for ${args.handyman_name} (${args.handyman_id})`);
+  } else {
+    // Cold outreach is business-initiated → must use a pre-approved template.
+    const res = await sendWhatsAppTemplate({
+      toPhone: phone,
+      templateName: config.whatsapp.outreachTemplate,
+      languageCode: config.whatsapp.outreachTemplateLang,
+      bodyParams: templateParams,
+    });
+    if (!res.success) {
+      console.error(`[WhatsApp Outreach] Failed to message ${args.handyman_name}: ${res.error}`);
+      sendStatus = "failed";
+    }
   }
 
   // Pre-insert a pending quote row so present_bid_results can show "waiting"
@@ -122,7 +160,7 @@ export async function whatsappHandyman(
       `INSERT INTO handyman_quotes
        (id, session_id, handyman_id, handyman_phone, raw_message, price_quoted, available, datetime_offered, wa_msg_id)
        VALUES (?, ?, ?, ?, ?, NULL, 0, NULL, NULL)`,
-      [randomUUID(), sessionId, args.handyman_id, args.handyman_phone,
+      [randomUUID(), sessionId, args.handyman_id, phone ?? "",
        sendStatus === "sent" ? "[PENDING — awaiting reply]" : "[SEND FAILED]"]
     );
   }
@@ -148,20 +186,26 @@ export async function whatsappMultipleHandymen(
 
   const results = await Promise.allSettled(
     args.handymen.map(async (h) => {
-      const message = buildOutreachMessage({
-        handymanName: h.handyman_name,
-        serviceType: args.service_type,
-        address: args.address,
-        datetime: args.datetime,
-        maxBudget: args.max_budget,
-      });
+      const outreach = { handymanName: h.handyman_name, serviceType: args.service_type, address: args.address, datetime: args.datetime, maxBudget: args.max_budget };
+      const templateParams = buildOutreachParams(outreach);
+
+      const phone = resolveHandymanPhone(h.handyman_id) ?? h.handyman_phone;
 
       let sendStatus = "sent";
-      try {
-        await sendWhatsAppMessage(h.handyman_phone, message);
-      } catch (err) {
-        console.error(`[WhatsApp Outreach] Failed to message ${h.handyman_name}:`, err);
+      if (!phone) {
         sendStatus = "failed";
+        console.error(`[WhatsApp Outreach] No number for ${h.handyman_name} (${h.handyman_id})`);
+      } else {
+        const res = await sendWhatsAppTemplate({
+          toPhone: phone,
+          templateName: config.whatsapp.outreachTemplate,
+          languageCode: config.whatsapp.outreachTemplateLang,
+          bodyParams: templateParams,
+        });
+        if (!res.success) {
+          console.error(`[WhatsApp Outreach] Failed to message ${h.handyman_name}: ${res.error}`);
+          sendStatus = "failed";
+        }
       }
 
       // Pre-insert pending row
@@ -169,7 +213,7 @@ export async function whatsappMultipleHandymen(
         `INSERT OR IGNORE INTO handyman_quotes
          (id, session_id, handyman_id, handyman_phone, raw_message, price_quoted, available, datetime_offered, wa_msg_id)
          VALUES (?, ?, ?, ?, ?, NULL, 0, NULL, NULL)`,
-        [randomUUID(), sessionId, h.handyman_id, h.handyman_phone,
+        [randomUUID(), sessionId, h.handyman_id, phone ?? "",
          sendStatus === "sent" ? "[PENDING — awaiting reply]" : "[SEND FAILED]"]
       );
 

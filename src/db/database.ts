@@ -81,10 +81,18 @@ function runMigrations(): void {
       status          TEXT DEFAULT 'pending',   -- pending|confirmed|completed|cancelled
       stripe_session  TEXT,
       payment_status  TEXT DEFAULT 'unpaid',    -- unpaid|paid
+      user_phone      TEXT,                     -- customer WhatsApp, shared w/ contractor once paid
       notes           TEXT,
       created_at      TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  // Backfill column for databases created before user_phone existed (no-op if present).
+  try {
+    db.run("ALTER TABLE bookings ADD COLUMN user_phone TEXT");
+  } catch {
+    /* column already exists */
+  }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS call_results (
@@ -129,6 +137,23 @@ function runMigrations(): void {
       wa_msg_id        TEXT,
       received_at      TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (handyman_id) REFERENCES handymen(id)
+    );
+  `);
+
+  // NEW: live web-discovered leads (via Exa). Stored server-side so their phone
+  // number never has to live on the client — discover_services_web returns a
+  // masked contact + an id; outreach/booking resolve the real number by id.
+  db.run(`
+    CREATE TABLE IF NOT EXISTS web_leads (
+      id           TEXT PRIMARY KEY,
+      name         TEXT NOT NULL,
+      phone        TEXT,
+      website      TEXT,
+      area         TEXT,
+      service_type TEXT,
+      price_hint   TEXT,
+      source_url   TEXT,
+      created_at   TEXT DEFAULT (datetime('now'))
     );
   `);
 

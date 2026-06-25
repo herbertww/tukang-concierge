@@ -2,9 +2,9 @@
  * index.ts
  * Tukang MCP Server — Entry Point
  *
- * Exposes 15 MCP tools for chat-native booking:
+ * Exposes 16 MCP tools for chat-native booking:
  *   Category A: User Context & Memory (2 tools)
- *   Category B: Discovery & Search (3 tools)
+ *   Category B: Discovery & Search (4 tools)
  *   Category C: Quoting (1 tool)
  *   Category D: Contractor Outreach via WhatsApp (2 tools)
  *   Category E: Bid Results Presentation (2 tools)
@@ -38,6 +38,8 @@ import {
   getHandymanProfileSchema,
   compareHandymanPrices,
   compareHandymanPricesSchema,
+  discoverServicesWeb,
+  discoverServicesWebSchema,
 } from "./tools/discovery.js";
 
 import { quoteJob, quoteJobSchema } from "./tools/quoting.js";
@@ -170,6 +172,12 @@ function createMcpServer(): McpServer {
     compareHandymanPricesSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await compareHandymanPrices(args) }] })
   );
+  server.tool(
+    "discover_services_web",
+    "Search the LIVE WEB (via Exa) for real local service providers beyond the seeded directory. Returns unverified leads normalized to the same shape as search_handymen (tagged source:'web') with their contact MASKED. Use when the seeded directory has no/too few matches; reach a lead with whatsapp_multiple_handymen using its id — the number is resolved server-side and only revealed after the platform fee is paid.",
+    discoverServicesWebSchema.shape,
+    async (args) => ({ content: [{ type: "text", text: await discoverServicesWeb(args) }] })
+  );
 
   // ── Category C: Quoting ─────────────────────────────────────────────────────
   server.tool(
@@ -182,13 +190,13 @@ function createMcpServer(): McpServer {
   // ── Category D: Contractor Outreach via WhatsApp ────────────────────────────
   server.tool(
     "whatsapp_handyman",
-    "Send a WhatsApp message to ONE contractor on the customer's behalf asking for availability, price, and datetime. Returns session_id to track replies. Contractor replies are captured automatically by the inbound webhook.",
+    "Send a WhatsApp message to ONE contractor on the customer's behalf asking for availability, price, and datetime. Pass the handyman_id — the number is resolved server-side, so you never need (and won't receive) the contractor's number. Returns session_id to track replies. Contractor replies are captured automatically by the inbound webhook.",
     whatsappHandymanSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await whatsappHandyman(args) }] })
   );
   server.tool(
     "whatsapp_multiple_handymen",
-    "Send WhatsApp messages to 1-5 contractors IN PARALLEL on the customer's behalf. All messages sent simultaneously. Returns a shared session_id — use present_bid_results with it to see contractor replies as they arrive via webhook.",
+    "Send WhatsApp messages to 1-5 contractors IN PARALLEL on the customer's behalf. Pass handyman_id for each — numbers are resolved server-side, never exposed to you. All messages sent simultaneously. Returns a shared session_id — use present_bid_results with it to see contractor replies as they arrive via webhook.",
     whatsappMultipleHandymenSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await whatsappMultipleHandymen(args) }] })
   );
@@ -413,6 +421,37 @@ async function main(): Promise<void> {
               [bookingId]
             );
             console.log(`✅ Payment confirmed for booking ${bookingId}`);
+
+            // Fee paid → hand the customer's number to the contractor so the two
+            // can coordinate (and exchange photos) directly. Free in-window msg.
+            const booking = queryOne<{
+              handyman_id: string;
+              user_phone: string | null;
+              service_type: string;
+              datetime: string;
+              address: string;
+            }>(
+              "SELECT handyman_id, user_phone, service_type, datetime, address FROM bookings WHERE id = ?",
+              [bookingId]
+            );
+            if (booking?.user_phone) {
+              const { resolveProvider } = await import("./lib/contact.js");
+              const { sendCustomerConnectionNotice } = await import("./lib/whatsapp.js");
+              const provider = resolveProvider(booking.handyman_id);
+              if (provider?.phone) {
+                await sendCustomerConnectionNotice({
+                  handymanName: provider.name,
+                  handymanPhone: provider.phone,
+                  customerPhone: booking.user_phone,
+                  serviceType: booking.service_type,
+                  datetime: booking.datetime,
+                  address: booking.address,
+                  bookingId,
+                });
+              }
+            } else {
+              console.warn(`[Stripe Webhook] No user_phone on booking ${bookingId}; contractor not auto-connected.`);
+            }
           }
         }
         res.json({ received: true });
@@ -424,13 +463,31 @@ async function main(): Promise<void> {
   );
 
   // ── Payment pages ───────────────────────────────────────────────────────────
-  app.get("/payment/success", (req: Request, res: Response) => {
+  app.get("/payment/success", async (req: Request, res: Response) => {
     const bookingId = req.query.booking_id as string;
+
+    // Reaching this page means Stripe checkout succeeded, so it's a legitimate
+    // moment to hand the contractor's number to the customer.
+    let contactBlock = "";
+    const booking = queryOne<{ handyman_id: string }>(
+      "SELECT handyman_id FROM bookings WHERE id = ?",
+      [bookingId]
+    );
+    if (booking) {
+      const { resolveProvider } = await import("./lib/contact.js");
+      const provider = resolveProvider(booking.handyman_id);
+      if (provider?.phone) {
+        contactBlock = `<p>You're now connected with <strong>${provider.name}</strong>.</p>
+      <p>WhatsApp them directly: <strong>${provider.phone}</strong><br>
+      <small>You can send photos of the problem and sort out timing together.</small></p>`;
+      }
+    }
+
     res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:40px">
       <h1>✅ Payment Successful!</h1>
       <p>Your platform fee has been received.</p>
       <p>Booking ID: <strong>${bookingId}</strong></p>
-      <p>Your contractor will arrive at the scheduled time. You will receive a WhatsApp notification when they are en route.</p>
+      ${contactBlock}
     </body></html>`);
   });
 
@@ -449,7 +506,7 @@ async function main(): Promise<void> {
       status: "ok",
       service: "tukang-mcp-server",
       version: "1.2.0",
-      tools: 15,
+      tools: 16,
       webhooks: ["/webhooks/whatsapp", "/webhooks/stripe"],
       timestamp: new Date().toISOString(),
     });
@@ -464,9 +521,9 @@ async function main(): Promise<void> {
 💳 Stripe Webhook:     http://localhost:${config.port}/webhooks/stripe
 📲 WhatsApp Webhook:   http://localhost:${config.port}/webhooks/whatsapp
 
-🛠️  15 Tools Available:
+🛠️  16 Tools Available:
    Category A — Memory:        get_saved_preferences, update_saved_preferences
-   Category B — Discovery:     search_handymen, get_handyman_profile, compare_handyman_prices
+   Category B — Discovery:     search_handymen, get_handyman_profile, compare_handyman_prices, discover_services_web
    Category C — Quoting:       quote_job
    Category D — Outreach:      whatsapp_handyman, whatsapp_multiple_handymen
    Category E — Bids:          present_bid_results, accept_winning_bid

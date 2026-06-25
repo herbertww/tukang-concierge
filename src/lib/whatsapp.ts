@@ -58,6 +58,59 @@ export async function sendWhatsAppMessage(
 }
 
 /**
+ * Send a pre-approved TEMPLATE message. Required for business-initiated
+ * (cold) outreach — Meta rejects free-form text outside an open 24h window.
+ * `bodyParams` fill the template's {{1}}, {{2}}, … in order; each must be a
+ * non-empty single-line string (Meta rejects empty params / newlines / 5+ spaces).
+ */
+export async function sendWhatsAppTemplate(params: {
+  toPhone: string;
+  templateName: string;
+  languageCode?: string;
+  bodyParams: string[];
+}): Promise<WASendResult> {
+  const { toPhone, templateName, bodyParams } = params;
+  const languageCode = params.languageCode ?? "en";
+
+  if (!config.whatsapp.token || !config.whatsapp.phoneNumberId) {
+    console.log(
+      `[WhatsApp SIM] To: ${toPhone}\nTemplate: ${templateName} (${languageCode})\nParams: ${JSON.stringify(bodyParams)}`
+    );
+    return { messageId: `sim_wa_tpl_${Date.now()}`, success: true };
+  }
+
+  try {
+    const res = await waClient.post<{ messages: Array<{ id: string }> }>(
+      `/${config.whatsapp.phoneNumberId}/messages`,
+      {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: toPhone.replace(/\D/g, ""),
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: bodyParams.length
+            ? [
+                {
+                  type: "body",
+                  parameters: bodyParams.map((text) => ({ type: "text", text })),
+                },
+              ]
+            : [],
+        },
+      }
+    );
+
+    return { messageId: res.data.messages[0]?.id ?? null, success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[WhatsApp] Template send error:", msg);
+    return { messageId: null, success: false, error: msg };
+  }
+}
+
+/**
  * Send a booking acceptance notification to a handyman.
  */
 export async function sendAcceptanceNotification(params: {
@@ -89,6 +142,40 @@ Please reply *YES* to confirm you accept this booking, or *NO* to decline.
 If you accept, the customer will complete a $5 platform fee payment and you will receive full contact details.
 
 _Powered by Tukang — Zero Phone Calls_
+  `.trim();
+
+  return sendWhatsAppMessage(params.handymanPhone, message);
+}
+
+/**
+ * Sent to the contractor the moment the $5 fee is paid: hands over the
+ * customer's number so the two can coordinate (and exchange photos) directly.
+ * This is a free-form message inside the contractor's open 24h window (they
+ * replied to accept), so it costs nothing.
+ */
+export async function sendCustomerConnectionNotice(params: {
+  handymanName: string;
+  handymanPhone: string;
+  customerPhone: string;
+  serviceType: string;
+  datetime: string;
+  address: string;
+  bookingId: string;
+}): Promise<WASendResult> {
+  const service = params.serviceType.replace(/_/g, " ");
+  const message = `
+✅ *Payment received — you're connected!*
+
+Hi ${params.handymanName}, the platform fee for booking *${params.bookingId}* is paid. You can now coordinate directly with the customer:
+
+📱 *Customer WhatsApp:* ${params.customerPhone}
+📋 *Service:* ${service}
+📅 *When:* ${params.datetime}
+📍 *Where:* ${params.address}
+
+Message them directly to confirm details — they may send photos of the problem. Any rescheduling is between you and the customer.
+
+_Powered by Tukang_
   `.trim();
 
   return sendWhatsAppMessage(params.handymanPhone, message);
