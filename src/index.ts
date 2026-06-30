@@ -19,6 +19,7 @@ import express, { Request, Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { randomUUID } from "crypto";
+import path from "path";
 
 import { initDatabase, execute, queryOne } from "./db/database.js";
 import { config } from "./lib/config.js";
@@ -552,6 +553,12 @@ async function main(): Promise<void> {
       timestamp: new Date().toISOString(),
     });
   });
+
+  // ── Landing page (static marketing site) ─────────────────────────────────────
+  // Registered last so all API/MCP/webhook routes take precedence. Serves
+  // tukang-site/index.html at "/" and static assets (logo, etc.) so visitors
+  // hitting tukang.app land on the marketing page.
+  app.use(express.static(path.join(process.cwd(), "tukang-site")));
 
   app.listen(config.port, () => {
     console.log(`

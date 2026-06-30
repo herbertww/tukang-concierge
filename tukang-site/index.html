@@ -437,9 +437,8 @@ document.getElementById('theme').addEventListener('click',function(){
   root.setAttribute('data-theme',n);try{localStorage.setItem('tukang-theme',n);}catch(e){}
 });
 
-/* ── connector URL (custom-connector-by-URL flow) ──
-   TODO: replace with the deployed MCP endpoint (PUBLIC_URL + "/mcp"). */
-var CONNECTOR_URL='https://connect.tukang.sg/mcp';
+/* ── connector URL (custom-connector-by-URL flow) ── */
+var CONNECTOR_URL='https://tukang.app/mcp';
 (function(){
   var box=document.getElementById('connectUrl');if(box)box.textContent=CONNECTOR_URL;
   var appName=document.getElementById('appName');
