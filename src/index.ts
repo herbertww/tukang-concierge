@@ -23,6 +23,7 @@ import path from "path";
 
 import { initDatabase, execute, queryOne } from "./db/database.js";
 import { config } from "./lib/config.js";
+import { registerOAuthRoutes } from "./lib/oauth.js";
 
 // ── Tool Handlers ─────────────────────────────────────────────────────────────
 import {
@@ -261,6 +262,10 @@ async function main(): Promise<void> {
 
   const app = express();
   app.use(express.json());
+
+  // OAuth shim so clients that require the OAuth handshake (e.g. Perplexity) can
+  // register and connect. /mcp itself stays open, so non-OAuth clients are unaffected.
+  registerOAuthRoutes(app);
 
   const transports = new Map<string, StreamableHTTPServerTransport>();
 

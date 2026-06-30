@@ -165,8 +165,9 @@ html[data-theme="light"] .confirm{color:#3f7a46}
 /* shared connector URL + method cards (web-first usage) */
 .connect-url{display:flex;gap:.5rem;max-width:520px;margin:1.8rem auto 0}
 .url-hint{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:.75rem 0 0;display:flex;align-items:center;justify-content:center;gap:.4rem}
-.methods{display:grid;grid-template-columns:1fr;gap:.9rem;margin:1.5rem auto 0;max-width:900px;text-align:left}
-@media(min-width:780px){.methods{grid-template-columns:repeat(3,1fr)}}
+.methods{display:grid;grid-template-columns:1fr;gap:.9rem;margin:1.5rem auto 0;max-width:920px;text-align:left}
+@media(min-width:560px){.methods{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:880px){.methods{grid-template-columns:repeat(4,1fr)}}
 .method-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:1.2rem 1.25rem;display:flex;flex-direction:column;gap:1rem;transition:border-color .15s,transform .15s}
 .method-card:hover{border-color:var(--accent-line);transform:translateY(-3px)}
 .method-head{display:flex;align-items:center;gap:.7rem}
@@ -335,7 +336,7 @@ footer{border-top:1px solid var(--line);padding:2.8rem 0 3.4rem}
         <span id="copyUrlLabel">Copy</span>
       </button>
     </div>
-    <p class="url-hint rv">One link, three web apps below ↓</p>
+    <p class="url-hint rv">One link, four web apps below ↓</p>
 
     <!-- Web platforms (no terminal needed) -->
     <div class="methods rv">
@@ -381,6 +382,21 @@ footer{border-top:1px solid var(--line);padding:2.8rem 0 3.4rem}
           <li>Open <b>Settings → MCP</b></li>
           <li>Click <b>Add MCP</b></li>
           <li>Paste the Tukang link above</li>
+        </ol>
+      </div>
+
+      <div class="method-card">
+        <div class="method-head">
+          <span class="method-logo" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2v17.6"/><path d="M12 7.2 5 4.2v8l7 3 7-3v-8l-7 3z"/></svg>
+          </span>
+          <div><h3>Perplexity</h3><span class="plan">Pro</span></div>
+          <span class="badge">Web</span>
+        </div>
+        <ol class="method-steps">
+          <li>Open <b>Settings → Connectors</b></li>
+          <li>Click <b>Add custom connector</b></li>
+          <li>Paste the link, check the box, <b>Add</b></li>
         </ol>
       </div>
     </div>
