@@ -404,62 +404,103 @@ async function main(): Promise<void> {
   });
 
   // ── Stripe webhook ──────────────────────────────────────────────────────────
+  // On successful payment we mark the booking paid/confirmed and auto-connect the
+  // customer with the contractor. Shared by both the checkout.session.completed and
+  // payment_intent.succeeded paths (a Checkout Session in mode:payment creates a
+  // PaymentIntent, so either event can fulfil the booking).
+  async function fulfilPaidBooking(bookingId: string): Promise<void> {
+    execute(
+      "UPDATE bookings SET payment_status = 'paid', status = 'confirmed' WHERE id = ?",
+      [bookingId]
+    );
+    console.log(`✅ Payment confirmed for booking ${bookingId}`);
+
+    // Fee paid → hand the customer's number to the contractor so the two
+    // can coordinate (and exchange photos) directly. Free in-window msg.
+    const booking = queryOne<{
+      handyman_id: string;
+      user_phone: string | null;
+      service_type: string;
+      datetime: string;
+      address: string;
+    }>(
+      "SELECT handyman_id, user_phone, service_type, datetime, address FROM bookings WHERE id = ?",
+      [bookingId]
+    );
+    if (booking?.user_phone) {
+      const { resolveProvider } = await import("./lib/contact.js");
+      const { sendCustomerConnectionNotice } = await import("./lib/whatsapp.js");
+      const provider = resolveProvider(booking.handyman_id);
+      if (provider?.phone) {
+        await sendCustomerConnectionNotice({
+          handymanName: provider.name,
+          handymanPhone: provider.phone,
+          customerPhone: booking.user_phone,
+          serviceType: booking.service_type,
+          datetime: booking.datetime,
+          address: booking.address,
+          bookingId,
+        });
+      }
+    } else {
+      console.warn(`[Stripe Webhook] No user_phone on booking ${bookingId}; contractor not auto-connected.`);
+    }
+  }
+
+  async function handleStripeWebhook(req: Request, res: Response): Promise<void> {
+    const sig = req.headers["stripe-signature"] as string;
+    try {
+      const { constructWebhookEvent } = await import("./lib/stripe.js");
+      const event = constructWebhookEvent(req.body as Buffer, sig);
+
+      switch (event.type) {
+        case "checkout.session.completed":
+        case "payment_intent.succeeded": {
+          // Both event payloads carry our booking metadata (see createServiceFeeCheckout).
+          const obj = event.data.object as { metadata?: { booking_id?: string } };
+          const bookingId = obj.metadata?.booking_id;
+          if (bookingId) {
+            await fulfilPaidBooking(bookingId);
+          } else {
+            console.warn(`[Stripe Webhook] ${event.type} had no booking_id metadata.`);
+          }
+          break;
+        }
+        case "payment_intent.payment_failed": {
+          const obj = event.data.object as { metadata?: { booking_id?: string } };
+          const bookingId = obj.metadata?.booking_id;
+          if (bookingId) {
+            execute(
+              "UPDATE bookings SET payment_status = 'failed' WHERE id = ?",
+              [bookingId]
+            );
+            console.warn(`[Stripe Webhook] Payment failed for booking ${bookingId}.`);
+          }
+          break;
+        }
+        case "payment_intent.created":
+          // Informational only — payment kicked off, nothing to fulfil yet.
+          break;
+        default:
+          break;
+      }
+      res.json({ received: true });
+    } catch (err) {
+      console.error("[Stripe Webhook] Error:", err);
+      res.status(400).json({ error: "Webhook verification failed" });
+    }
+  }
+
+  // Primary route (matches the registered Stripe endpoint); /webhooks/stripe kept as alias.
+  app.post(
+    "/api/payments/webhook",
+    express.raw({ type: "application/json" }),
+    handleStripeWebhook
+  );
   app.post(
     "/webhooks/stripe",
     express.raw({ type: "application/json" }),
-    async (req: Request, res: Response) => {
-      const sig = req.headers["stripe-signature"] as string;
-      try {
-        const { constructWebhookEvent } = await import("./lib/stripe.js");
-        const event = constructWebhookEvent(req.body as Buffer, sig);
-        if (event.type === "checkout.session.completed") {
-          const session = event.data.object as { metadata?: { booking_id?: string } };
-          const bookingId = session.metadata?.booking_id;
-          if (bookingId) {
-            execute(
-              "UPDATE bookings SET payment_status = 'paid', status = 'confirmed' WHERE id = ?",
-              [bookingId]
-            );
-            console.log(`✅ Payment confirmed for booking ${bookingId}`);
-
-            // Fee paid → hand the customer's number to the contractor so the two
-            // can coordinate (and exchange photos) directly. Free in-window msg.
-            const booking = queryOne<{
-              handyman_id: string;
-              user_phone: string | null;
-              service_type: string;
-              datetime: string;
-              address: string;
-            }>(
-              "SELECT handyman_id, user_phone, service_type, datetime, address FROM bookings WHERE id = ?",
-              [bookingId]
-            );
-            if (booking?.user_phone) {
-              const { resolveProvider } = await import("./lib/contact.js");
-              const { sendCustomerConnectionNotice } = await import("./lib/whatsapp.js");
-              const provider = resolveProvider(booking.handyman_id);
-              if (provider?.phone) {
-                await sendCustomerConnectionNotice({
-                  handymanName: provider.name,
-                  handymanPhone: provider.phone,
-                  customerPhone: booking.user_phone,
-                  serviceType: booking.service_type,
-                  datetime: booking.datetime,
-                  address: booking.address,
-                  bookingId,
-                });
-              }
-            } else {
-              console.warn(`[Stripe Webhook] No user_phone on booking ${bookingId}; contractor not auto-connected.`);
-            }
-          }
-        }
-        res.json({ received: true });
-      } catch (err) {
-        console.error("[Stripe Webhook] Error:", err);
-        res.status(400).json({ error: "Webhook verification failed" });
-      }
-    }
+    handleStripeWebhook
   );
 
   // ── Payment pages ───────────────────────────────────────────────────────────
@@ -507,7 +548,7 @@ async function main(): Promise<void> {
       service: "tukang-mcp-server",
       version: "1.2.0",
       tools: 16,
-      webhooks: ["/webhooks/whatsapp", "/webhooks/stripe"],
+      webhooks: ["/webhooks/whatsapp", "/api/payments/webhook", "/webhooks/stripe"],
       timestamp: new Date().toISOString(),
     });
   });
@@ -518,7 +559,7 @@ async function main(): Promise<void> {
 
 📡 MCP Endpoint:       http://localhost:${config.port}/mcp
 🏥 Health Check:       http://localhost:${config.port}/health
-💳 Stripe Webhook:     http://localhost:${config.port}/webhooks/stripe
+💳 Stripe Webhook:     http://localhost:${config.port}/api/payments/webhook
 📲 WhatsApp Webhook:   http://localhost:${config.port}/webhooks/whatsapp
 
 🛠️  16 Tools Available:

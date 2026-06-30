@@ -50,29 +50,40 @@ export async function createServiceFeeCheckout(params: {
   const stripe = getStripe();
   const service = params.serviceType.replace(/_/g, " ");
 
+  // Booking metadata rides on BOTH the session and the underlying PaymentIntent,
+  // so webhook handlers keyed off either checkout.session.* or payment_intent.*
+  // events can resolve the booking.
+  const sharedMetadata = {
+    booking_id: params.bookingId,
+    user_id: params.userId,
+    handyman_name: params.handymanName,
+    service_type: params.serviceType,
+  };
+
+  // Prefer the pre-created SGD price (STRIPE_SERVICE_FEE_PRICE_ID) when configured;
+  // otherwise fall back to an inline SGD price.
+  const lineItem: Stripe.Checkout.SessionCreateParams.LineItem =
+    config.stripe.serviceFeePrice
+      ? { price: config.stripe.serviceFeePrice, quantity: 1 }
+      : {
+          price_data: {
+            currency: "sgd",
+            unit_amount: 500, // S$5.00 in cents
+            product_data: {
+              name: "Tukang Service Fee",
+              description: `Platform fee for connecting you with ${params.handymanName} for ${service} service. This is separate from the handyman's rate, which you pay directly upon job completion.`,
+              images: [],
+            },
+          },
+          quantity: 1,
+        };
+
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "payment",
     payment_method_types: ["card"],
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          unit_amount: 500, // $5.00 in cents
-          product_data: {
-            name: "Tukang Service Fee",
-            description: `Platform fee for connecting you with ${params.handymanName} for ${service} service. This is separate from the handyman's rate, which you pay directly upon job completion.`,
-            images: [],
-          },
-        },
-        quantity: 1,
-      },
-    ],
-    metadata: {
-      booking_id: params.bookingId,
-      user_id: params.userId,
-      handyman_name: params.handymanName,
-      service_type: params.serviceType,
-    },
+    line_items: [lineItem],
+    payment_intent_data: { metadata: sharedMetadata },
+    metadata: sharedMetadata,
     success_url: `${config.stripe.publicUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&booking_id=${params.bookingId}`,
     cancel_url: `${config.stripe.publicUrl}/payment/cancel?booking_id=${params.bookingId}`,
     ...(params.userEmail ? { customer_email: params.userEmail } : {}),
