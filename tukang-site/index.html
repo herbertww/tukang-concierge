@@ -162,6 +162,31 @@ html[data-theme="light"] .confirm{color:#3f7a46}
 .term-foot{display:flex;align-items:center;gap:.5rem;padding:.7rem 1rem;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted)}
 .term-foot .ghl{margin-left:auto;color:var(--accent);font-weight:600;display:inline-flex;align-items:center;gap:.35rem}
 
+/* shared connector URL + method cards (web-first usage) */
+.connect-url{display:flex;gap:.5rem;max-width:520px;margin:1.8rem auto 0}
+.url-hint{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:.75rem 0 0;display:flex;align-items:center;justify-content:center;gap:.4rem}
+.methods{display:grid;grid-template-columns:1fr;gap:.9rem;margin:1.5rem auto 0;max-width:900px;text-align:left}
+@media(min-width:780px){.methods{grid-template-columns:repeat(3,1fr)}}
+.method-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:1.2rem 1.25rem;display:flex;flex-direction:column;gap:1rem;transition:border-color .15s,transform .15s}
+.method-card:hover{border-color:var(--accent-line);transform:translateY(-3px)}
+.method-head{display:flex;align-items:center;gap:.7rem}
+.method-logo{width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--card-2);border:1px solid var(--line);color:var(--text)}
+.method-head h3{font-family:var(--disp);font-weight:600;font-size:1.06rem;letter-spacing:-.01em;line-height:1.15}
+.method-head .plan{display:block;font-size:.7rem;color:var(--faint);margin-top:.1rem}
+.badge{margin-left:auto;align-self:flex-start;font-family:var(--mono);font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;padding:.2rem .45rem;border-radius:99px;border:1px solid var(--accent-line);color:var(--accent)}
+.badge.ide{border-color:var(--line-strong);color:var(--muted)}
+.method-steps{list-style:none;display:flex;flex-direction:column;gap:.55rem;counter-reset:ms}
+.method-steps li{position:relative;padding-left:1.75rem;font-size:.9rem;color:var(--muted);line-height:1.4;counter-increment:ms}
+.method-steps li::before{content:counter(ms);position:absolute;left:0;top:.05rem;width:1.2rem;height:1.2rem;border-radius:50%;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);font-family:var(--mono);font-size:.64rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+.method-steps b{color:var(--text);font-weight:600}
+.ide-row{max-width:900px;margin:.9rem auto 0;text-align:left}
+.method-card.ide p{font-size:.9rem;color:var(--muted);line-height:1.45;margin:0}
+.method-card.ide b{color:var(--text);font-weight:600}
+.mini-code{font-family:var(--mono);font-size:.8rem;background:#0C0E11;color:#8FC79A;border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:.6rem .8rem;overflow-x:auto;white-space:nowrap}
+.ds-note{max-width:900px;margin:1rem auto 0;text-align:left;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:11px;padding:.8rem 1rem;font-size:.88rem;color:var(--text);line-height:1.45;display:flex;gap:.6rem;align-items:flex-start}
+.ds-note b{font-weight:600}
+.ds-note .warn{flex-shrink:0;color:var(--accent)}
+
 /* HOW */
 #how{background:var(--bg-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .how-intro{color:var(--muted);max-width:54ch;margin-top:.5rem;font-size:clamp(1rem,1.5vw,1.15rem);line-height:1.55}
@@ -300,28 +325,89 @@ footer{border-top:1px solid var(--line);padding:2.8rem 0 3.4rem}
   <div class="wrap" style="text-align:center">
     <div class="eyebrow rv" style="display:inline-flex">Add it to your AI</div>
     <h2 class="sec rv" style="max-width:20ch;margin-left:auto;margin-right:auto">Add Tukang like an app.</h2>
-    <p class="sec-lead rv" style="max-width:42ch;margin:.6rem auto 0">No download. No account. It connects to the chat app you already use.</p>
+    <p class="sec-lead rv" style="max-width:44ch;margin:.6rem auto 0">No download. No account. Paste one link into the AI chat app you already use.</p>
 
-    <div class="connect rv">
-      <div class="app-pick" role="tablist" aria-label="Choose your AI app">
-        <button class="app-btn" role="tab" id="app-claude" aria-selected="true">Claude</button>
-        <button class="app-btn" role="tab" id="app-chatgpt" aria-selected="false">ChatGPT</button>
-      </div>
-      <div class="csteps">
-        <div class="cstep"><span class="cn">1</span><span>In <b id="appName">Claude</b>, open <b>Settings → Connectors</b>.</span></div>
-        <div class="cstep"><span class="cn">2</span><span>Choose <b>Add custom connector</b>.</span></div>
-        <div class="cstep"><span class="cn">3</span><span>Paste the Tukang link and connect:
-          <span class="urlrow">
-            <span class="urlbox" id="connectUrl"></span>
-            <button class="url-copy" id="copyUrlBtn" aria-label="Copy Tukang connector link">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-              <span id="copyUrlLabel">Copy</span>
-            </button>
-          </span>
-        </span></div>
-      </div>
-      <p class="connect-foot">Then just ask: <b>“Find me a plumber this Saturday.”</b></p>
+    <!-- Shared connector link (same everywhere) -->
+    <div class="connect-url rv">
+      <span class="urlbox" id="connectUrl"></span>
+      <button class="url-copy" id="copyUrlBtn" aria-label="Copy Tukang connector link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        <span id="copyUrlLabel">Copy</span>
+      </button>
     </div>
+    <p class="url-hint rv">One link, three web apps below ↓</p>
+
+    <!-- Web platforms (no terminal needed) -->
+    <div class="methods rv">
+      <div class="method-card">
+        <div class="method-head">
+          <span class="method-logo" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9z"/><path d="M12 7.5l3.9 2.25v4.5L12 16.5l-3.9-2.25v-4.5z"/></svg>
+          </span>
+          <div><h3>ChatGPT</h3><span class="plan">Plus · Pro · Business · Enterprise</span></div>
+          <span class="badge">Web</span>
+        </div>
+        <ol class="method-steps">
+          <li>Open <b>Settings → Apps</b></li>
+          <li>Click <b>Add custom app</b></li>
+          <li>Paste the Tukang link above</li>
+        </ol>
+      </div>
+
+      <div class="method-card">
+        <div class="method-head">
+          <span class="method-logo" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.6l1.7 6.9 5.1-4.8-2.7 6.6 6.9-1.3-5.8 3.9 5.8 3.9-6.9-1.3 2.7 6.6-5.1-4.8L12 22.4l-1.7-6.9-5.1 4.8 2.7-6.6L1 15l5.8-3.9L1 7.2l6.9 1.3-2.7-6.6 5.1 4.8z"/></svg>
+          </span>
+          <div><h3>Claude</h3><span class="plan">All plans</span></div>
+          <span class="badge">Web</span>
+        </div>
+        <ol class="method-steps">
+          <li>Open <b>Settings → Integrations</b></li>
+          <li>Click <b>Add MCP server</b></li>
+          <li>Paste the Tukang link above</li>
+        </ol>
+      </div>
+
+      <div class="method-card">
+        <div class="method-head">
+          <span class="method-logo" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7.5"/><path d="M14.2 14.2L18.5 18.5"/></svg>
+          </span>
+          <div><h3>Qwen Chat</h3><span class="plan">qwen.ai web · desktop app</span></div>
+          <span class="badge">Web</span>
+        </div>
+        <ol class="method-steps">
+          <li>Open <b>Settings → MCP</b></li>
+          <li>Click <b>Add MCP</b></li>
+          <li>Paste the Tukang link above</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- DeepSeek: IDE / API clients only -->
+    <div class="ide-row rv">
+      <div class="method-card ide">
+        <div class="method-head">
+          <span class="method-logo" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13c3 0 4-2.2 6.2-2.2S11.4 14 14.5 14c2.7 0 4.3-1.7 4.3-4.2"/><path d="M14.5 14c0 2.2-1.6 3.6-3.8 3.6"/><circle cx="17.6" cy="7.6" r="1" fill="currentColor" stroke="none"/></svg>
+          </span>
+          <div><h3>DeepSeek</h3><span class="plan">via IDE / API clients only</span></div>
+          <span class="badge ide">IDE only</span>
+        </div>
+        <p>Works in <b>Cursor</b>, <b>VS Code + Cline</b>, or <b>Claude Code</b>. Add to your MCP config:</p>
+        <div class="mini-code">{ "url": "https://tukang.app/mcp" }</div>
+      </div>
+    </div>
+
+    <p class="ds-note rv">
+      <span class="warn" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18.5A2 2 0 0 0 3.5 21.5h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+      </span>
+      <span><b>DeepSeek's web chat doesn't support custom MCP apps yet.</b> If you're on DeepSeek web, use <b>ChatGPT</b>, <b>Claude</b>, or <b>Qwen</b> on the web instead.</span>
+    </p>
+
+    <p class="connect-foot" style="margin-top:1.3rem">Once connected, just ask: <b>“Find me a plumber this Saturday.”</b></p>
 
     <div class="devwrap rv">
       <details>
@@ -441,12 +527,6 @@ document.getElementById('theme').addEventListener('click',function(){
 var CONNECTOR_URL='https://tukang.app/mcp';
 (function(){
   var box=document.getElementById('connectUrl');if(box)box.textContent=CONNECTOR_URL;
-  var appName=document.getElementById('appName');
-  var aC=document.getElementById('app-claude'),aG=document.getElementById('app-chatgpt');
-  function pick(app){if(appName)appName.textContent=(app==='chatgpt'?'ChatGPT':'Claude');
-    if(aC)aC.setAttribute('aria-selected',app==='claude');if(aG)aG.setAttribute('aria-selected',app==='chatgpt');}
-  if(aC)aC.addEventListener('click',function(){pick('claude');});
-  if(aG)aG.addEventListener('click',function(){pick('chatgpt');});
   var ul=document.getElementById('copyUrlLabel');
   function copyUrl(){var done=function(){if(ul){ul.textContent='Copied ✓';setTimeout(function(){ul.textContent='Copy';},1600);}};
     if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(CONNECTOR_URL).then(done).catch(fb);}else{fb();}
