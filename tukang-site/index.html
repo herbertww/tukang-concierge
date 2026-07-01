@@ -201,10 +201,12 @@ html[data-theme="light"] .confirm{color:#3f7a46}
 .marquee{width:100%;overflow:hidden;background:var(--bg-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:.85rem 0}
 .marquee-track{display:flex;width:max-content;will-change:transform;animation:marquee 30s linear infinite}
 .marquee:hover .marquee-track{animation-play-state:paused}
-.marquee-item{font-family:var(--mono);font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);white-space:nowrap;padding:0 24px}
+.marquee-item{font-family:var(--mono);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);white-space:nowrap;padding:0 24px}
 .marquee-item::after{content:"◆";color:var(--accent);font-size:.62em;margin-left:24px;vertical-align:middle}
 @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media(prefers-reduced-motion:reduce){.marquee-track{animation:none}}
+.marquee.marquee-top{border-top:none;padding:.6rem 0;background:color-mix(in srgb,var(--bg-soft) 60%,transparent)}
+.marquee.marquee-top .marquee-item{font-size:13px}
 
 /* HOW */
 #how{background:var(--bg-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
@@ -296,6 +298,18 @@ footer{border-top:1px solid var(--line);padding:2.8rem 0 3.4rem}
     </div>
   </div>
 </nav>
+
+<!-- SERVICE MARQUEE (top strip — signals full service range) -->
+<div class="marquee marquee-top" aria-label="Home services available on Tukang">
+  <div class="marquee-track">
+    <span class="marquee-group">
+      <span class="marquee-item">Plumbing</span><span class="marquee-item">Electrical</span><span class="marquee-item">Aircon repair</span><span class="marquee-item">Carpentry</span><span class="marquee-item">Cleaning</span><span class="marquee-item">Pest control</span><span class="marquee-item">Painting</span><span class="marquee-item">Roofing</span><span class="marquee-item">Movers</span><span class="marquee-item">Locksmith</span><span class="marquee-item">Renovation</span><span class="marquee-item">Tiling</span><span class="marquee-item">Gardening</span><span class="marquee-item">Appliance repair</span>
+    </span>
+    <span class="marquee-group" aria-hidden="true">
+      <span class="marquee-item">Plumbing</span><span class="marquee-item">Electrical</span><span class="marquee-item">Aircon repair</span><span class="marquee-item">Carpentry</span><span class="marquee-item">Cleaning</span><span class="marquee-item">Pest control</span><span class="marquee-item">Painting</span><span class="marquee-item">Roofing</span><span class="marquee-item">Movers</span><span class="marquee-item">Locksmith</span><span class="marquee-item">Renovation</span><span class="marquee-item">Tiling</span><span class="marquee-item">Gardening</span><span class="marquee-item">Appliance repair</span>
+    </span>
+  </div>
+</div>
 
 <!-- HERO -->
 <section id="hero">
