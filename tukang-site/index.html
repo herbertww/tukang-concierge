@@ -165,28 +165,30 @@ html[data-theme="light"] .confirm{color:#3f7a46}
 /* shared connector URL + method cards (web-first usage) */
 .connect-url{display:flex;gap:.5rem;max-width:520px;margin:1.8rem auto 0}
 .url-hint{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:.75rem 0 0;display:flex;align-items:center;justify-content:center;gap:.4rem}
-.methods{display:grid;grid-template-columns:1fr;gap:.9rem;margin:1.5rem auto 0;max-width:920px;text-align:left}
-@media(min-width:560px){.methods{grid-template-columns:repeat(2,1fr)}}
-@media(min-width:880px){.methods{grid-template-columns:repeat(4,1fr)}}
-.method-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:1.2rem 1.25rem;display:flex;flex-direction:column;gap:1rem;transition:border-color .15s,transform .15s}
-.method-card:hover{border-color:var(--accent-line);transform:translateY(-3px)}
-.method-head{display:flex;align-items:center;gap:.7rem}
-.method-logo{width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--card-2);border:1px solid var(--line);color:var(--text)}
-.method-head h3{font-family:var(--disp);font-weight:600;font-size:1.06rem;letter-spacing:-.01em;line-height:1.15}
-.method-head .plan{display:block;font-size:.7rem;color:var(--faint);margin-top:.1rem}
-.badge{margin-left:auto;align-self:flex-start;font-family:var(--mono);font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;padding:.2rem .45rem;border-radius:99px;border:1px solid var(--accent-line);color:var(--accent)}
+/* connect panel — one embedded, tabbed surface (replaces the bezel-card grid) */
+.badge{font-family:var(--mono);font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;padding:.2rem .45rem;border-radius:99px;border:1px solid var(--accent-line);color:var(--accent)}
 .badge.ide{border-color:var(--line-strong);color:var(--muted)}
-.method-steps{list-style:none;display:flex;flex-direction:column;gap:.55rem;counter-reset:ms}
-.method-steps li{position:relative;padding-left:1.75rem;font-size:.9rem;color:var(--muted);line-height:1.4;counter-increment:ms}
-.method-steps li::before{content:counter(ms);position:absolute;left:0;top:.05rem;width:1.2rem;height:1.2rem;border-radius:50%;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);font-family:var(--mono);font-size:.64rem;font-weight:700;display:flex;align-items:center;justify-content:center}
-.method-steps b{color:var(--text);font-weight:600}
-.ide-row{max-width:900px;margin:.9rem auto 0;text-align:left}
-.method-card.ide p{font-size:.9rem;color:var(--muted);line-height:1.45;margin:0}
-.method-card.ide b{color:var(--text);font-weight:600}
-.mini-code{font-family:var(--mono);font-size:.8rem;background:#0C0E11;color:#8FC79A;border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:.6rem .8rem;overflow-x:auto;white-space:nowrap}
-.ds-note{max-width:900px;margin:1rem auto 0;text-align:left;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:11px;padding:.8rem 1rem;font-size:.88rem;color:var(--text);line-height:1.45;display:flex;gap:.6rem;align-items:flex-start}
-.ds-note b{font-weight:600}
-.ds-note .warn{flex-shrink:0;color:var(--accent)}
+.mini-code{font-family:var(--mono);font-size:.8rem;background:#0C0E11;color:#8FC79A;border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:.6rem .8rem;overflow-x:auto;white-space:nowrap;margin-top:1rem}
+.connect-panel{max-width:720px;margin:1.6rem auto 0;background:var(--bg-soft);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;text-align:left}
+.cp-tabs{display:flex;gap:.2rem;padding:.4rem;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.cp-tabs::-webkit-scrollbar{display:none}
+.cp-tab{flex:1 0 auto;display:flex;align-items:center;justify-content:center;gap:.5rem;background:none;border:0;cursor:pointer;font-family:var(--disp);font-weight:600;font-size:.9rem;color:var(--muted);padding:.62rem .85rem;border-radius:9px;white-space:nowrap;transition:color .15s,background .15s}
+.cp-tab:hover{color:var(--text)}
+.cp-tab[aria-selected="true"]{color:var(--text);background:var(--card)}
+.cp-tab svg{width:16px;height:16px;flex-shrink:0;color:var(--faint);transition:color .15s}
+.cp-tab:hover svg,.cp-tab[aria-selected="true"] svg{color:var(--accent)}
+.cp-body{padding:1.5rem 1.6rem 1.7rem}
+@media(prefers-reduced-motion:no-preference){.cp-body{animation:cpfade .24s ease}}
+@keyframes cpfade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.cp-plan{display:flex;align-items:center;gap:.6rem;margin-bottom:1.35rem}
+.cp-plan .lbl{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.cp-steps{display:grid;grid-template-columns:1fr;gap:1rem;counter-reset:cs}
+@media(min-width:620px){.cp-steps{grid-template-columns:repeat(3,1fr);gap:1.3rem}}
+.cp-step{display:flex;gap:.6rem;align-items:flex-start;counter-increment:cs;font-size:.92rem;color:var(--muted);line-height:1.45}
+.cp-step::before{content:counter(cs);flex-shrink:0;width:1.35rem;height:1.35rem;border-radius:50%;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);font-family:var(--mono);font-size:.66rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+.cp-step b{color:var(--text);font-weight:600}
+.cp-note{font-size:.92rem;color:var(--muted);line-height:1.5;margin:0}
+.cp-note b{color:var(--text);font-weight:600}
 
 /* reassurance trio */
 .reassure{display:grid;grid-template-columns:1fr;gap:1.4rem;max-width:820px;margin:2.6rem auto 0;text-align:left}
@@ -353,92 +355,24 @@ footer{border-top:1px solid var(--line);padding:2.8rem 0 3.4rem}
         <span id="copyUrlLabel">Copy</span>
       </button>
     </div>
-    <p class="url-hint rv">One link, four web apps below ↓</p>
+    <p class="url-hint rv">One link — pick your app below ↓</p>
 
-    <!-- Web platforms (no terminal needed) -->
-    <div class="methods rv">
-      <div class="method-card">
-        <div class="method-head">
-          <span class="method-logo" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9z"/><path d="M12 7.5l3.9 2.25v4.5L12 16.5l-3.9-2.25v-4.5z"/></svg>
-          </span>
-          <div><h3>ChatGPT</h3><span class="plan">Plus · Pro · Business · Enterprise</span></div>
-          <span class="badge">Web</span>
-        </div>
-        <ol class="method-steps">
-          <li>Open <b>Settings → Apps</b></li>
-          <li>Click <b>Add custom app</b></li>
-          <li>Paste the Tukang link above</li>
-        </ol>
+    <!-- Connect: one embedded, tabbed panel (no bezel-card grid) -->
+    <div class="connect-panel rv">
+      <div class="cp-tabs" role="tablist" aria-label="Choose your AI app">
+        <button class="cp-tab" role="tab" data-app="chatgpt" aria-selected="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9z"/><path d="M12 7.5l3.9 2.25v4.5L12 16.5l-3.9-2.25v-4.5z"/></svg>ChatGPT</button>
+        <button class="cp-tab" role="tab" data-app="claude" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.6l1.7 6.9 5.1-4.8-2.7 6.6 6.9-1.3-5.8 3.9 5.8 3.9-6.9-1.3 2.7 6.6-5.1-4.8L12 22.4l-1.7-6.9-5.1 4.8 2.7-6.6L1 15l5.8-3.9L1 7.2l6.9 1.3-2.7-6.6 5.1 4.8z"/></svg>Claude</button>
+        <button class="cp-tab" role="tab" data-app="qwen" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="M14.2 14.2L18.5 18.5"/></svg>Qwen</button>
+        <button class="cp-tab" role="tab" data-app="perplexity" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.2v17.6"/><path d="M12 7.2 5 4.2v8l7 3 7-3v-8l-7 3z"/></svg>Perplexity</button>
+        <button class="cp-tab" role="tab" data-app="deepseek" aria-selected="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 13c3 0 4-2.2 6.2-2.2S11.4 14 14.5 14c2.7 0 4.3-1.7 4.3-4.2"/><path d="M14.5 14c0 2.2-1.6 3.6-3.8 3.6"/><circle cx="17.6" cy="7.6" r="1" fill="currentColor" stroke="none"/></svg>DeepSeek</button>
       </div>
-
-      <div class="method-card">
-        <div class="method-head">
-          <span class="method-logo" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.6l1.7 6.9 5.1-4.8-2.7 6.6 6.9-1.3-5.8 3.9 5.8 3.9-6.9-1.3 2.7 6.6-5.1-4.8L12 22.4l-1.7-6.9-5.1 4.8 2.7-6.6L1 15l5.8-3.9L1 7.2l6.9 1.3-2.7-6.6 5.1 4.8z"/></svg>
-          </span>
-          <div><h3>Claude</h3><span class="plan">All plans</span></div>
-          <span class="badge">Web</span>
-        </div>
-        <ol class="method-steps">
-          <li>Open <b>Settings → Integrations</b></li>
-          <li>Click <b>Add MCP server</b></li>
-          <li>Paste the Tukang link above</li>
-        </ol>
-      </div>
-
-      <div class="method-card">
-        <div class="method-head">
-          <span class="method-logo" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7.5"/><path d="M14.2 14.2L18.5 18.5"/></svg>
-          </span>
-          <div><h3>Qwen Chat</h3><span class="plan">qwen.ai web · desktop app</span></div>
-          <span class="badge">Web</span>
-        </div>
-        <ol class="method-steps">
-          <li>Open <b>Settings → MCP</b></li>
-          <li>Click <b>Add MCP</b></li>
-          <li>Paste the Tukang link above</li>
-        </ol>
-      </div>
-
-      <div class="method-card">
-        <div class="method-head">
-          <span class="method-logo" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2v17.6"/><path d="M12 7.2 5 4.2v8l7 3 7-3v-8l-7 3z"/></svg>
-          </span>
-          <div><h3>Perplexity</h3><span class="plan">Pro</span></div>
-          <span class="badge">Web</span>
-        </div>
-        <ol class="method-steps">
-          <li>Open <b>Settings → Connectors</b></li>
-          <li>Click <b>Add custom connector</b></li>
-          <li>Paste the link, check the box, <b>Add</b></li>
-        </ol>
-      </div>
+      <div class="cp-body" id="cpBody" role="tabpanel"><!-- rendered by JS --></div>
     </div>
-
-    <!-- DeepSeek: IDE / API clients only -->
-    <div class="ide-row rv">
-      <div class="method-card ide">
-        <div class="method-head">
-          <span class="method-logo" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13c3 0 4-2.2 6.2-2.2S11.4 14 14.5 14c2.7 0 4.3-1.7 4.3-4.2"/><path d="M14.5 14c0 2.2-1.6 3.6-3.8 3.6"/><circle cx="17.6" cy="7.6" r="1" fill="currentColor" stroke="none"/></svg>
-          </span>
-          <div><h3>DeepSeek</h3><span class="plan">via IDE / API clients only</span></div>
-          <span class="badge ide">IDE only</span>
-        </div>
-        <p>Works in <b>Cursor</b>, <b>VS Code + Cline</b>, or <b>Claude Code</b>. Add to your MCP config:</p>
-        <div class="mini-code">{ "url": "https://tukang.app/mcp" }</div>
-      </div>
-    </div>
-
-    <p class="ds-note rv">
-      <span class="warn" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18.5A2 2 0 0 0 3.5 21.5h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
-      </span>
-      <span><b>DeepSeek's web chat doesn't support custom MCP apps yet.</b> If you're on DeepSeek web, use <b>ChatGPT</b>, <b>Claude</b>, or <b>Qwen</b> on the web instead.</span>
-    </p>
 
     <p class="connect-foot" style="margin-top:1.3rem">Once connected, just ask: <b>“Find me a plumber this Saturday.”</b></p>
 
@@ -597,6 +531,29 @@ var CONNECTOR_URL='https://tukang.app/mcp';
   var cbtn=document.getElementById('copyUrlBtn');if(cbtn)cbtn.addEventListener('click',copyUrl);
   // hero CTA: scroll to the connect section and copy the link
   [].forEach.call(document.querySelectorAll('[data-copytop]'),function(b){b.addEventListener('click',function(){document.getElementById('install').scrollIntoView({behavior:'smooth',block:'center'});setTimeout(copyUrl,440);});});
+})();
+
+/* ── connect panel: tabbed steps (one app at a time, embedded) ── */
+(function(){
+  var APPS={
+    chatgpt:{badge:'Web',plan:'Plus · Pro · Business · Enterprise',steps:['Open <b>Settings → Apps</b>','Click <b>Add custom app</b>','Paste the Tukang link above']},
+    claude:{badge:'Web',plan:'All plans',steps:['Open <b>Settings → Integrations</b>','Click <b>Add MCP server</b>','Paste the Tukang link above']},
+    qwen:{badge:'Web',plan:'qwen.ai web · desktop app',steps:['Open <b>Settings → MCP</b>','Click <b>Add MCP</b>','Paste the Tukang link above']},
+    perplexity:{badge:'Web',plan:'Pro',steps:['Open <b>Settings → Connectors</b>','Click <b>Add custom connector</b>','Paste the link, check the box, <b>Add</b>']},
+    deepseek:{badge:'IDE',plan:'IDE / API clients only',note:'Works in <b>Cursor</b>, <b>VS Code + Cline</b>, or <b>Claude Code</b>. Add to your MCP config:',code:'{ "url": "https://tukang.app/mcp" }'}
+  };
+  var body=document.getElementById('cpBody'),tabs=[].slice.call(document.querySelectorAll('.cp-tab'));
+  if(!body||!tabs.length)return;
+  function render(app){
+    var a=APPS[app];if(!a)return;
+    var h='<div class="cp-plan"><span class="badge'+(a.badge==='IDE'?' ide':'')+'">'+a.badge+'</span><span class="lbl">'+a.plan+'</span></div>';
+    if(a.steps){h+='<div class="cp-steps">';a.steps.forEach(function(s){h+='<div class="cp-step">'+s+'</div>';});h+='</div>';}
+    else{h+='<p class="cp-note">'+a.note+'</p><div class="mini-code">'+a.code+'</div>';}
+    body.innerHTML=h;
+    tabs.forEach(function(t){t.setAttribute('aria-selected',t.dataset.app===app?'true':'false');});
+  }
+  tabs.forEach(function(t){t.addEventListener('click',function(){render(t.dataset.app);});});
+  render('chatgpt');
 })();
 
 /* developer manual config tabs + copy (inside the expander) */
