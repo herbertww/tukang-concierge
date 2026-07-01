@@ -312,11 +312,17 @@ export async function discoverServicesWeb(
     numResults: input.num_results,
   });
 
-  const handymen = result.providers.map((p) => {
+  // Only surface leads we can actually reach through Tukang's WhatsApp outreach.
+  // A lead with no number on file is useless to the flow (we never send the user
+  // off-platform to a website), so we drop it rather than show an empty/"masked"
+  // contact the customer can't act on.
+  const contactable = result.providers.filter((p) => Boolean(p.phone));
+
+  const handymen = contactable.map((p) => {
     const id = `web_${randomUUID().slice(0, 8)}`;
-    // Persist the lead server-side so its number never lives on the client.
-    // The output below masks it; outreach + booking resolve it by id, and it is
-    // only unmasked once the $5 Concierge fee is paid — same gate as curated supply.
+    // Persist the lead (incl. its number) server-side so the number never lives
+    // on the client. Outreach + booking resolve it by id; it is only revealed to
+    // the customer once the $5 Concierge fee is paid — same gate as curated supply.
     execute(
       `INSERT INTO web_leads (id, name, phone, website, area, service_type, price_hint, source_url)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -331,23 +337,21 @@ export async function discoverServicesWeb(
         p.source_url ?? null,
       ]
     );
+    // NOTE: intentionally no `contact`/`phone`/`website` field. The number is the
+    // product sold by the $5 Concierge fee and must never appear (even masked)
+    // pre-payment; outreach happens by id via whatsapp_multiple_handymen.
     return {
       id,
       name: p.name,
       location: p.area ?? location ?? "Singapore",
       rating: null,
-      bookings: null,
+      reviews_count: 0,
       price_min: null,
       price_max: null,
       price_hint: p.price_hint,
       trust_score: null,
       acra_status: "unverified",
       service_types: [input.service_type],
-      // Masked until the $5 fee is paid — never the raw number, web or not.
-      // null (not a mask string) means we have no phone on file for this lead
-      // yet, not that one is being withheld.
-      contact: contactForOutput(id, p.phone),
-      contact_unlocked: isContactUnlocked(id),
       source: "web" as const,
       available_times: [],
     };
@@ -359,10 +363,10 @@ export async function discoverServicesWeb(
     source: result.simulated ? "exa-simulated" : "exa-web",
     total_found: handymen.length,
     note:
-      "Web-discovered leads are unverified (no rating/review history yet) — confirm details before booking. " +
-      "`contact` is null when we have no phone on file, or a masked value like \"+65 •••• 4567\" when a real number exists but is hidden. " +
-      "Reach a lead with whatsapp_multiple_handymen using its id; the real number is resolved server-side and revealed only after the $5 Concierge fee is paid. " +
-      "Do not surface a lead's website/source_url or suggest the user contact them directly outside Tukang — outreach must go through whatsapp_multiple_handymen.",
+      "Web-discovered leads are unverified — no reviews or rating history yet (rating:null, reviews_count:0). " +
+      "Every lead returned is reachable via Tukang; do NOT render a phone/contact column and never expose or invent a number, website, or source link — the contact is the product the $5 Concierge fee unlocks. " +
+      "Reach any lead with whatsapp_multiple_handymen using its id (number resolved server-side). " +
+      "Never suggest the user call, message, or visit a provider directly outside Tukang.",
     query_used: result.query,
     handymen,
   });
