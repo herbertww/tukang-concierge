@@ -40,6 +40,14 @@ src/tools/*.ts        one file per tool category: zod schema + async handler →
 
 ⚠️ **`assets/` is a frozen legacy dump** — its own package.json, a parallel src tree, a React frontend, and a stale `vapi.ts`. Nothing in it is imported or runs. Never treat it as live code or a reference for current behavior.
 
+## Marketing Site (`tukang-site/`)
+
+Single static `index.html`, served by the same Express app (`app.use(express.static(...))` in `src/index.ts`) at `/`. No build step.
+
+- **Canonical logo:** `tukang-site/logo.svg` (chat-bubble + brass wrench mark, `#19211F`/`#CBA15A`/`#ECEAE1`, wordmark set in Schibsted Grotesk 800). Inlined directly into the nav (`.brand`) and footer (`.foot-brand`) rather than referenced via `<img>`, matching the site's existing inline-SVG pattern. The saved `.svg` file itself isn't fetched by the page — it exists as the source-of-truth asset for regenerating other renders (OG image, favicon).
+- **`tukang-site/og-image.png`** (1200×630) and **`tukang-site/favicon.png`** (512×512) are raster renders of that same logo, generated via headless Chrome screenshot (no image-conversion CLI is installed locally) since social-preview crawlers and browser favicons need real image files, not inline SVG. Referenced by absolute `https://tukang.app/...` URLs in `<head>` (`og:image`, `twitter:image`, `rel="icon"`) — crawlers won't resolve relative paths. **If the logo changes again, both PNGs need regenerating from the new source**, not just the inline nav/footer SVG.
+- **Deploy is manual, not git-triggered:** Railway isn't wired to auto-deploy on push. Every site or server change needs `railway up --service tukang` after `git push`. Pushing to `main` alone does not update tukang.app.
+
 ## Architecture Gotchas (load-bearing)
 
 - **ESM relative imports need explicit `.js`** even though sources are `.ts` (e.g. `import { config } from "../lib/config.js"`). Omitting it fails at runtime even if `tsc` is silent.
