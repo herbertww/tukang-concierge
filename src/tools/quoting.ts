@@ -329,7 +329,7 @@ export async function quoteJob(input: QuoteJobInput): Promise<string> {
     notes: [
       "Prices are estimates. Final price confirmed by handyman after site assessment.",
       "Materials not included unless specified.",
-      "Tukang $5 platform fee applies separately via Stripe.",
+      "Tukang $5 Concierge fee applies separately via Stripe.",
       "Handyman's rate is paid directly upon job completion.",
     ],
     next_step: "Use search_handymen to find available handymen, then whatsapp_multiple_handymen to get real quotes.",

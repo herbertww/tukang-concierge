@@ -186,7 +186,7 @@ ${cheapest ? `💬 Reply "Book ${cheapest.name}" to accept cheapest ($${cheapest
           name: cheapest.name,
           price: cheapest.price_quoted,
           datetime: cheapest.datetime_offered,
-          // Masked until the platform fee is paid — see lib/contact.ts.
+          // Masked until the Concierge fee is paid — see lib/contact.ts.
           contact: contactForOutput(cheapest.handyman_id, cheapest.phone ?? null),
         }
       : null,
@@ -312,13 +312,13 @@ export async function acceptWinningBid(
     stripe_session_id: stripeSessionId,
     acceptance_status: "waiting_for_handyman_reply",
     payment_explanation:
-      "The $5 Tukang platform fee connects you with the handyman. " +
+      "The $5 Tukang Concierge fee connects you with the handyman. " +
       "The handyman's rate ($" +
       input.booking_details.price +
       ") is paid directly to them upon job completion.",
     next_steps: [
       `${handyman.name} has been notified via WhatsApp and asked to reply YES or NO.`,
-      "Once they confirm, complete the $5 platform fee via the Stripe link.",
+      "Once they confirm, complete the $5 Concierge fee via the Stripe link.",
       "You will receive a WhatsApp confirmation once payment is complete.",
     ],
   });

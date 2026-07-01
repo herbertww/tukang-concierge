@@ -119,12 +119,12 @@ export async function bookJob(input: BookJobInput): Promise<string> {
     stripe_link: stripeLink,
     stripe_session_id: stripeSessionId,
     payment_explanation: [
-      `💳 Platform fee: $5 (pay via Stripe link above)`,
+      `💳 Concierge fee: $5 (pay via Stripe link above)`,
       `💰 Handyman rate: $${booking.price} (pay ${handyman?.name ?? "handyman"} directly upon completion)`,
       `📋 Booking ID: ${booking.id}`,
     ],
     what_happens_next: [
-      "1. Pay the $5 platform fee via the Stripe link.",
+      "1. Pay the $5 Concierge fee via the Stripe link.",
       `2. ${handyman?.name ?? "Your handyman"} will arrive at ${booking.datetime}.`,
       "3. You will receive a WhatsApp notification when they are en route.",
       `4. Pay $${booking.price} directly to ${handyman?.name ?? "the handyman"} after the job is done.`,

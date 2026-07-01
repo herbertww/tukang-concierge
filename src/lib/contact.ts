@@ -3,7 +3,7 @@
  * Single source of truth for contractor contact disclosure.
  *
  * Business rule (load-bearing): the contractor's phone/WhatsApp number is the
- * asset the $5 platform fee sells ("connects you with the handyman"). Names are
+ * asset the $5 Concierge fee sells ("connects you with the handyman"). Names are
  * never sensitive; numbers are. A curated-directory contractor's number must
  * NEVER appear in a tool's output until the customer has actually PAID the fee
  * for a booking with that contractor.
@@ -34,7 +34,7 @@ export function maskPhone(phone: string | null | undefined): string | null {
 }
 
 /**
- * True once the customer has PAID the platform fee for a booking with this
+ * True once the customer has PAID the Concierge fee for a booking with this
  * contractor. This is the gate — `payment_status='paid'` is set only by the
  * Stripe webhook (src/index.ts), so it cannot be forged from the client side.
  */

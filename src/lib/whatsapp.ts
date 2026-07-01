@@ -23,6 +23,18 @@ export interface WASendResult {
   error?: string;
 }
 
+/** Pull Meta's actual error body out of an Axios failure instead of just the HTTP status. */
+function describeWaError(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const apiError = err.response?.data?.error;
+    if (apiError) {
+      return `[${apiError.code ?? "?"}] ${apiError.message ?? "unknown"}${apiError.error_data?.details ? ` — ${apiError.error_data.details}` : ""}`;
+    }
+    return err.message;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
 /**
  * Send a text message to a WhatsApp number.
  */
@@ -51,7 +63,7 @@ export async function sendWhatsAppMessage(
       success: true,
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = describeWaError(err);
     console.error("[WhatsApp] Send error:", msg);
     return { messageId: null, success: false, error: msg };
   }
@@ -104,7 +116,7 @@ export async function sendWhatsAppTemplate(params: {
 
     return { messageId: res.data.messages[0]?.id ?? null, success: true };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = describeWaError(err);
     console.error("[WhatsApp] Template send error:", msg);
     return { messageId: null, success: false, error: msg };
   }
@@ -139,7 +151,7 @@ A customer has selected YOUR bid. Here are the details:
 
 Please reply *YES* to confirm you accept this booking, or *NO* to decline.
 
-If you accept, the customer will complete a $5 platform fee payment and you will receive full contact details.
+If you accept, the customer will complete a $5 Concierge fee payment and you will receive full contact details.
 
 _Powered by Tukang — Zero Phone Calls_
   `.trim();
@@ -148,7 +160,7 @@ _Powered by Tukang — Zero Phone Calls_
 }
 
 /**
- * Sent to the contractor the moment the $5 fee is paid: hands over the
+ * Sent to the contractor the moment the $5 Concierge fee is paid: hands over the
  * customer's number so the two can coordinate (and exchange photos) directly.
  * This is a free-form message inside the contractor's open 24h window (they
  * replied to accept), so it costs nothing.
@@ -166,7 +178,7 @@ export async function sendCustomerConnectionNotice(params: {
   const message = `
 ✅ *Payment received — you're connected!*
 
-Hi ${params.handymanName}, the platform fee for booking *${params.bookingId}* is paid. You can now coordinate directly with the customer:
+Hi ${params.handymanName}, the Concierge fee for booking *${params.bookingId}* is paid. You can now coordinate directly with the customer:
 
 📱 *Customer WhatsApp:* ${params.customerPhone}
 📋 *Service:* ${service}

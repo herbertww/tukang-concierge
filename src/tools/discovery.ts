@@ -165,7 +165,7 @@ export async function getHandymanProfile(
   return JSON.stringify({
     id: handyman.id,
     name: handyman.name,
-    // Contact is gated: masked until the $5 platform fee is paid for this
+    // Contact is gated: masked until the $5 Concierge fee is paid for this
     // contractor. Real number is resolved server-side for outreach — see
     // lib/contact.ts. Do NOT add raw phone/whatsapp back to this output.
     contact: contactForOutput(handyman.id, handyman.whatsapp ?? handyman.phone),
@@ -285,10 +285,10 @@ export const discoverServicesWebSchema = z.object({
     .number()
     .int()
     .min(1)
-    .max(15)
+    .max(5)
     .optional()
-    .default(10)
-    .describe("How many web providers to retrieve."),
+    .default(5)
+    .describe("How many web providers to retrieve. Capped at 5 — each result costs a live web search."),
   user_id: z
     .string()
     .optional()
@@ -316,7 +316,7 @@ export async function discoverServicesWeb(
     const id = `web_${randomUUID().slice(0, 8)}`;
     // Persist the lead server-side so its number never lives on the client.
     // The output below masks it; outreach + booking resolve it by id, and it is
-    // only unmasked once the platform fee is paid — same gate as curated supply.
+    // only unmasked once the $5 Concierge fee is paid — same gate as curated supply.
     execute(
       `INSERT INTO web_leads (id, name, phone, website, area, service_type, price_hint, source_url)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -344,12 +344,11 @@ export async function discoverServicesWeb(
       acra_status: "unverified",
       service_types: [input.service_type],
       // Masked until the $5 fee is paid — never the raw number, web or not.
+      // null (not a mask string) means we have no phone on file for this lead
+      // yet, not that one is being withheld.
       contact: contactForOutput(id, p.phone),
       contact_unlocked: isContactUnlocked(id),
-      has_phone: Boolean(p.phone),
-      website: p.website,
       source: "web" as const,
-      source_url: p.source_url,
       available_times: [],
     };
   });
@@ -359,7 +358,11 @@ export async function discoverServicesWeb(
     location_filter: location ?? "Singapore",
     source: result.simulated ? "exa-simulated" : "exa-web",
     total_found: handymen.length,
-    note: "Web-discovered leads are unverified — confirm details before booking. Their contact is masked; reach them with whatsapp_multiple_handymen using the id (the number is resolved server-side and revealed only after the platform fee is paid).",
+    note:
+      "Web-discovered leads are unverified (no rating/review history yet) — confirm details before booking. " +
+      "`contact` is null when we have no phone on file, or a masked value like \"+65 •••• 4567\" when a real number exists but is hidden. " +
+      "Reach a lead with whatsapp_multiple_handymen using its id; the real number is resolved server-side and revealed only after the $5 Concierge fee is paid. " +
+      "Do not surface a lead's website/source_url or suggest the user contact them directly outside Tukang — outreach must go through whatsapp_multiple_handymen.",
     query_used: result.query,
     handymen,
   });

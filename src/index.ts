@@ -176,7 +176,7 @@ function createMcpServer(): McpServer {
   );
   server.tool(
     "discover_services_web",
-    "Search the LIVE WEB (via Exa) for real local service providers beyond the seeded directory. Returns unverified leads normalized to the same shape as search_handymen (tagged source:'web') with their contact MASKED. Use when the seeded directory has no/too few matches; reach a lead with whatsapp_multiple_handymen using its id — the number is resolved server-side and only revealed after the platform fee is paid.",
+    "Search the LIVE WEB (via Exa) for real local service providers beyond the seeded directory. Returns unverified leads normalized to the same shape as search_handymen (tagged source:'web') with their contact MASKED. Use when the seeded directory has no/too few matches; reach a lead with whatsapp_multiple_handymen using its id — the number is resolved server-side and only revealed after the $5 Concierge fee is paid.",
     discoverServicesWebSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await discoverServicesWeb(args) }] })
   );
@@ -212,7 +212,7 @@ function createMcpServer(): McpServer {
   );
   server.tool(
     "accept_winning_bid",
-    "User accepts the cheapest (or chosen) contractor. Triggers WhatsApp confirmation message to winner asking YES/NO. Sends rejection notices to runner-ups. Generates Stripe $5 platform fee payment link.",
+    "User accepts the cheapest (or chosen) contractor. Triggers WhatsApp confirmation message to winner asking YES/NO. Sends rejection notices to runner-ups. Generates Stripe $5 Concierge fee payment link.",
     acceptWinningBidSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await acceptWinningBid(args) }] })
   );
@@ -220,7 +220,7 @@ function createMcpServer(): McpServer {
   // ── Category F: Booking & Payment ──────────────────────────────────────────
   server.tool(
     "book_job",
-    "Finalise booking after contractor accepts via WhatsApp. Creates confirmed booking record, generates Stripe $5 platform fee checkout link.",
+    "Finalise booking after contractor accepts via WhatsApp. Creates confirmed booking record, generates Stripe $5 Concierge fee checkout link.",
     bookJobSchema.shape,
     async (args) => ({ content: [{ type: "text", text: await bookJob(args) }] })
   );
@@ -532,7 +532,7 @@ async function main(): Promise<void> {
 
     res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:40px">
       <h1>✅ Payment Successful!</h1>
-      <p>Your platform fee has been received.</p>
+      <p>Your Concierge fee has been received.</p>
       <p>Booking ID: <strong>${bookingId}</strong></p>
       ${contactBlock}
     </body></html>`);
