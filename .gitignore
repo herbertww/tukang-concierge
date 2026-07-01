@@ -9,3 +9,8 @@ tukang.db
 *.log
 .claude/
 .agents/
+
+# Private fundraising / pitch materials — keep OUT of this public repo
+Tukang-Pitch-Deck.pdf
+tukang-pitch.slides.html
+investor-deck/
