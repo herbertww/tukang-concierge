@@ -24,6 +24,7 @@ import path from "path";
 import { initDatabase, execute, queryOne } from "./db/database.js";
 import { config } from "./lib/config.js";
 import { registerOAuthRoutes } from "./lib/oauth.js";
+import { handleConciergeChat } from "./lib/concierge.js";
 
 // ── Tool Handlers ─────────────────────────────────────────────────────────────
 import {
@@ -547,6 +548,47 @@ async function main(): Promise<void> {
     </body></html>`);
   });
 
+  // ── Onsite Concierge chat (landing-page widget) ─────────────────────────────
+  // Backs the "Prefer to use our onsite Concierge?" section on tukang.app.
+  // Qwen-powered reply + optional Stripe checkout link; contact stays gated
+  // exactly like the MCP tools (see lib/concierge.ts).
+  app.post("/api/concierge", async (req: Request, res: Response) => {
+    try {
+      const body = req.body as { messages?: unknown; userId?: unknown };
+      const raw = Array.isArray(body?.messages) ? body.messages : null;
+      if (!raw || raw.length === 0 || raw.length > 30) {
+        res.status(400).json({ error: "messages must be an array of 1-30 items" });
+        return;
+      }
+      const messages = raw.map((m): { role: "user" | "assistant"; content: string } => {
+        const msg = m as { role?: unknown; content?: unknown };
+        if (
+          (msg.role !== "user" && msg.role !== "assistant") ||
+          typeof msg.content !== "string" ||
+          msg.content.length === 0 ||
+          msg.content.length > 2000
+        ) {
+          throw new Error("invalid message");
+        }
+        return { role: msg.role as "user" | "assistant", content: msg.content };
+      });
+      const userId =
+        typeof body.userId === "string" && body.userId.trim()
+          ? body.userId.trim().slice(0, 64)
+          : undefined;
+
+      const result = await handleConciergeChat(messages, userId);
+      res.json(result);
+    } catch (err) {
+      if (err instanceof Error && err.message === "invalid message") {
+        res.status(400).json({ error: "each message needs role user|assistant and content ≤2000 chars" });
+        return;
+      }
+      console.error("[Concierge] Error:", err);
+      res.status(500).json({ error: "Concierge unavailable right now" });
+    }
+  });
+
   // ── Health check ────────────────────────────────────────────────────────────
   app.get("/health", (_req: Request, res: Response) => {
     res.json({
@@ -555,6 +597,7 @@ async function main(): Promise<void> {
       version: "1.2.0",
       tools: 16,
       webhooks: ["/webhooks/whatsapp", "/api/payments/webhook", "/webhooks/stripe"],
+      api: ["/api/concierge"],
       timestamp: new Date().toISOString(),
     });
   });
@@ -573,6 +616,7 @@ async function main(): Promise<void> {
 🏥 Health Check:       http://localhost:${config.port}/health
 💳 Stripe Webhook:     http://localhost:${config.port}/api/payments/webhook
 📲 WhatsApp Webhook:   http://localhost:${config.port}/webhooks/whatsapp
+💬 Onsite Concierge:   http://localhost:${config.port}/api/concierge
 
 🛠️  16 Tools Available:
    Category A — Memory:        get_saved_preferences, update_saved_preferences

@@ -4,6 +4,18 @@ function optional(key: string, fallback = ""): string {
   return process.env[key] ?? fallback;
 }
 
+/**
+ * Qwen Cloud base URL, per the QwenCloud AI Hackathon guide:
+ * - pay-as-you-go / free-tier keys (sk-...) → international DashScope endpoint
+ * - Token Plan keys (sk-sp-...) → token-plan endpoint (mixing the two returns 401 InvalidApiKey)
+ */
+function qwenDefaultBaseUrl(): string {
+  const key = process.env.QWEN_API_KEY ?? process.env.DASHSCOPE_API_KEY ?? "";
+  return key.startsWith("sk-sp-")
+    ? "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
+    : "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
+}
+
 export const config = {
   port: parseInt(optional("PORT", "8000"), 10),
   nodeEnv: optional("NODE_ENV", "development"),
@@ -32,9 +44,9 @@ export const config = {
   },
 
   qwen: {
-    apiKey: optional("QWEN_API_KEY"),
-    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    model: optional("QWEN_MODEL", "qwen-max"),
+    apiKey: optional("QWEN_API_KEY") || optional("DASHSCOPE_API_KEY"),
+    baseUrl: optional("QWEN_BASE_URL", qwenDefaultBaseUrl()),
+    model: optional("QWEN_MODEL", "qwen3.7-max"),
   },
 
   exa: {

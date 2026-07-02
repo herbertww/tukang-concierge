@@ -1,7 +1,13 @@
 /**
  * qwen.ts
  * Qwen Cloud (Alibaba Cloud DashScope) client, OpenAI-compatible chat completions.
- * Docs: https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope
+ * Docs: https://docs.qwencloud.com
+ *
+ * Endpoints per the QwenCloud AI Hackathon guide:
+ *   pay-as-you-go / free tier: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+ *   Token Plan (sk-sp- keys): https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+ * Base URL is selected automatically from the key prefix in config.ts (never mix the two).
+ * Default model: qwen3.7-max (override with QWEN_MODEL).
  *
  * This is Tukang's Alibaba Cloud API usage proof for the Qwen Cloud Global Hackathon
  * (Track 4 — Autopilot Agent).

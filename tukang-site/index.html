@@ -220,6 +220,30 @@ html[data-theme="light"] .confirm{color:#3f7a46}
 .marquee.marquee-top{border-top:none;padding:.6rem 0;background:color-mix(in srgb,var(--bg-soft) 60%,transparent)}
 .marquee.marquee-top .marquee-item{font-size:13px}
 
+/* ONSITE CONCIERGE CHAT */
+#concierge{padding-top:clamp(2.5rem,5vw,4rem)}
+.chatw{max-width:720px;margin:1.8rem auto 0;text-align:left}
+.chat-body{padding:clamp(1rem,2.5vw,1.4rem);height:min(380px,60vh);min-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:.7rem}
+.chat-body .d-user,.chat-body .d-bot{white-space:pre-line;flex-shrink:0}
+.typing{align-self:flex-start;display:inline-flex;gap:.3rem;background:var(--card-2);border:1px solid var(--line);padding:.7rem .9rem;border-radius:13px;border-bottom-left-radius:4px;flex-shrink:0}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:tblink 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.2s}.typing i:nth-child(3){animation-delay:.4s}
+@keyframes tblink{0%,100%{opacity:.25}50%{opacity:1}}
+.chat-chips{display:flex;gap:.5rem;flex-wrap:wrap;padding:.4rem .9rem .8rem}
+.chat-chip{font-family:var(--body);font-weight:500;font-size:.84rem;color:var(--muted);background:var(--card-2);border:1px solid var(--line);border-radius:99px;padding:.4rem .85rem;cursor:pointer;transition:color .15s,border-color .15s}
+.chat-chip:hover{color:var(--text);border-color:var(--accent-line)}
+.chat-form{display:flex;gap:.5rem;padding:.7rem .8rem;border-top:1px solid var(--line);background:var(--card-2)}
+.chat-input{flex:1;min-width:0;font-family:var(--body);font-size:.95rem;color:var(--text);background:var(--bg-soft);border:1px solid var(--line);border-radius:9px;padding:.6rem .8rem;outline:none;transition:border-color .15s}
+.chat-input:focus{border-color:var(--accent-line)}
+.chat-input::placeholder{color:var(--faint)}
+.chat-send{flex-shrink:0;font-family:var(--disp);font-weight:600;font-size:.92rem;color:var(--accent-ink);background:var(--accent);border:none;border-radius:9px;padding:.6rem 1.1rem;cursor:pointer;transition:opacity .15s}
+.chat-send:hover{opacity:.9}
+.chat-send:disabled{opacity:.5;cursor:default}
+.pay-cta{align-self:flex-start;display:inline-flex;align-items:center;gap:.5rem;font-family:var(--disp);font-weight:700;font-size:.92rem;color:#fff;background:#635BFF;border-radius:11px;padding:.65rem 1.05rem;transition:opacity .15s;flex-shrink:0}
+.pay-cta:hover{opacity:.9}
+.chat-foot{margin-top:.9rem;text-align:center;font-size:.86rem;color:var(--faint)}
+.chat-foot b{color:var(--muted);font-weight:600}
+
 /* HOW */
 #how{background:var(--bg-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .how-intro{color:var(--muted);max-width:54ch;margin-top:.5rem;font-size:clamp(1rem,1.5vw,1.15rem);line-height:1.55}
@@ -297,6 +321,7 @@ footer{border-top:1px solid var(--line);padding:2.8rem 0 3.4rem}
       </svg>
     </a>
     <div class="nav-links">
+      <a href="#concierge">Concierge</a>
       <a href="#how">How it works</a>
       <a href="#book">What you can book</a>
       <a href="#why">Why MCP</a>
@@ -442,6 +467,36 @@ footer{border-top:1px solid var(--line);padding:2.8rem 0 3.4rem}
           </div>
         </div>
       </details>
+    </div>
+  </div>
+</section>
+
+<!-- ONSITE CONCIERGE -->
+<section id="concierge">
+  <div class="wrap" style="text-align:center">
+    <div class="eyebrow rv" style="display:inline-flex">Onsite Concierge</div>
+    <h2 class="sec rv" style="max-width:22ch;margin-left:auto;margin-right:auto">Prefer to use our onsite Concierge?</h2>
+    <p class="sec-lead rv" style="max-width:46ch;margin:.6rem auto 0">No AI app required. Describe the job right here — the Concierge lines up vetted contractors and takes the S$5 fee through Stripe Checkout.</p>
+    <div class="chatw rv">
+      <div class="win">
+        <div class="win-bar">
+          <div class="win-dots"><i></i><i></i><i></i></div>
+          <div class="win-title">Tukang Concierge <span class="live"><i></i>live</span></div>
+        </div>
+        <div class="chat-body" id="ccBody" aria-live="polite">
+          <div class="d-bot">Hi! I'm the Tukang Concierge. Tell me what needs fixing, where you are, and when — I'll line up bids from vetted contractors.</div>
+        </div>
+        <div class="chat-chips" id="ccChips" aria-label="Suggested requests">
+          <button class="chat-chip" type="button">Leaking tap in Toa Payoh this Saturday</button>
+          <button class="chat-chip" type="button">Aircon servicing, 3 units, Tampines</button>
+          <button class="chat-chip" type="button">Mount a TV in Jurong East</button>
+        </div>
+        <form class="chat-form" id="ccForm">
+          <input class="chat-input" id="ccInput" type="text" maxlength="500" autocomplete="off" placeholder="Describe your job…" aria-label="Message the Tukang Concierge"/>
+          <button class="chat-send" id="ccSend" type="submit">Send</button>
+        </form>
+      </div>
+      <p class="chat-foot">Runs on Qwen Cloud · payments by <b>Stripe</b> · contractor contact unlocks after the S$5 fee.</p>
     </div>
   </div>
 </section>
@@ -605,6 +660,46 @@ function doCopy(){var text=configs[current].raw,done=function(){copyLabel.textCo
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done).catch(fb);}else{fb();}
   function fb(){var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);done();}}
 document.getElementById('copyBtn').addEventListener('click',doCopy);
+
+/* ── onsite concierge chat (talks to POST /api/concierge) ── */
+(function(){
+  var body=document.getElementById('ccBody'),form=document.getElementById('ccForm'),
+      input=document.getElementById('ccInput'),send=document.getElementById('ccSend'),
+      chips=document.getElementById('ccChips');
+  if(!body||!form)return;
+  var history=[],busy=false;
+  function scroll(){body.scrollTop=body.scrollHeight;}
+  function bubble(cls,text){var d=document.createElement('div');d.className=cls;d.textContent=text;body.appendChild(d);scroll();return d;}
+  function payButton(url){
+    var a=document.createElement('a');a.className='pay-cta';a.href=url;a.target='_blank';a.rel='noopener';
+    a.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg> Pay S$5 · Stripe Checkout';
+    body.appendChild(a);scroll();
+  }
+  function typing(){var t=document.createElement('div');t.className='typing';t.innerHTML='<i></i><i></i><i></i>';body.appendChild(t);scroll();return t;}
+  var ERR='Sorry — the Concierge is unavailable right now. Try again in a moment.';
+  function sendMsg(text){
+    text=(text||'').trim();
+    if(!text||busy)return;
+    busy=true;send.disabled=true;
+    if(chips)chips.style.display='none';
+    bubble('d-user',text);
+    history.push({role:'user',content:text});
+    var t=typing();
+    fetch('/api/concierge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:history})})
+      .then(function(r){return r.json();})
+      .then(function(res){
+        if(t.parentNode)t.parentNode.removeChild(t);
+        var reply=(res&&res.reply)||ERR;
+        history.push({role:'assistant',content:reply});
+        bubble('d-bot',reply);
+        if(res&&res.checkout&&res.checkout.paymentUrl)payButton(res.checkout.paymentUrl);
+      })
+      .catch(function(){if(t.parentNode)t.parentNode.removeChild(t);bubble('d-bot',ERR);})
+      .then(function(){busy=false;send.disabled=false;input.focus();});
+  }
+  form.addEventListener('submit',function(e){e.preventDefault();var v=input.value;input.value='';sendMsg(v);});
+  if(chips)[].forEach.call(chips.querySelectorAll('.chat-chip'),function(c){c.addEventListener('click',function(){sendMsg(c.textContent);});});
+})();
 
 /* reveal */
 if('IntersectionObserver' in window){

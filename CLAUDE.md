@@ -34,6 +34,9 @@ src/db/database.ts    sql.js init, migrations, execute()/queryOne()/queryAll()
 src/db/seed.ts        `npm run seed` — idempotent demo data
 src/lib/config.ts     typed env loader (single `config` object; all files import this)
 src/lib/{mem0,whatsapp,stripe,qwen,exa}.ts   external clients (all degrade w/o keys)
+src/lib/concierge.ts  onsite Concierge chat backend (POST /api/concierge): Qwen reply grounded
+                      in the handymen directory (no phones), [[CHECKOUT: name | service]] marker
+                      → pending booking + Stripe checkout link; scripted fallback w/o QWEN_API_KEY
 src/lib/contact.ts    contact-disclosure gate: maskPhone / isContactUnlocked / resolveProvider / resolveHandymanPhone / contactForOutput
 src/tools/*.ts        one file per tool category: zod schema + async handler → JSON string
 ```
@@ -46,6 +49,7 @@ Single static `index.html`, served by the same Express app (`app.use(express.sta
 
 - **Canonical logo:** `tukang-site/logo.svg` (chat-bubble + brass wrench mark, `#19211F`/`#CBA15A`/`#ECEAE1`, wordmark set in Schibsted Grotesk 800). Inlined directly into the nav (`.brand`) and footer (`.foot-brand`) rather than referenced via `<img>`, matching the site's existing inline-SVG pattern. The saved `.svg` file itself isn't fetched by the page — it exists as the source-of-truth asset for regenerating other renders (OG image, favicon).
 - **`tukang-site/og-image.png`** (1200×630) and **`tukang-site/favicon.png`** (512×512) are raster renders of that same logo, generated via headless Chrome screenshot (no image-conversion CLI is installed locally) since social-preview crawlers and browser favicons need real image files, not inline SVG. Referenced by absolute `https://tukang.app/...` URLs in `<head>` (`og:image`, `twitter:image`, `rel="icon"`) — crawlers won't resolve relative paths. **If the logo changes again, both PNGs need regenerating from the new source**, not just the inline nav/footer SVG.
+- **Onsite Concierge chat widget:** section `#concierge` ("Prefer to use our onsite Concierge?") sits right after the "Add Tukang like an app" section. Frontend JS posts the running message history to `POST /api/concierge`; when the response carries `checkout.paymentUrl` it renders a "Pay S$5 · Stripe Checkout" button. Backend logic lives in `src/lib/concierge.ts` (contact-gating applies — no provider phones in replies).
 - **Deploy is manual, not git-triggered:** Railway isn't wired to auto-deploy on push. Every site or server change needs `railway up --service tukang` after `git push`. Pushing to `main` alone does not update tukang.app.
 
 ## Architecture Gotchas (load-bearing)
@@ -84,11 +88,11 @@ npm run dev     # tsx watch src/index.ts
 npm run seed    # demo handymen + reviews (idempotent)
 npm run lint    # tsc --noEmit
 ```
-Endpoints: `GET /health` · `POST /mcp` · `POST /webhooks/whatsapp` · `POST /webhooks/stripe`
+Endpoints: `GET /health` · `POST /mcp` · `POST /api/concierge` · `POST /webhooks/whatsapp` · `POST /webhooks/stripe`
 
 ## Hackathon (Qwen Cloud Global, Track 4 — Autopilot Agent, due 2026-07-09)
 
-Submission repo must be public + MIT (license visible in GitHub About). Backend on Alibaba Cloud ECS; LLM = Qwen Cloud/DashScope (`https://dashscope.aliyuncs.com/compatible-mode/v1`, model `qwen-max`); `src/lib/qwen.ts` is the proof-of-Alibaba-usage file to link.
+Submission repo must be public + MIT (license visible in GitHub About). Backend on Alibaba Cloud; LLM = Qwen Cloud/DashScope. Per the official hackathon guide: pay-as-you-go/free-tier base URL is `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` (70M+ free tokens for new accounts), default model `qwen3.7-max`; Token Plan keys (`sk-sp-…`) must instead use `https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1` — mixing endpoints returns 401 InvalidApiKey. `config.ts` auto-selects the base URL from the key prefix (`QWEN_BASE_URL`/`QWEN_MODEL` override). `src/lib/qwen.ts` is the proof-of-Alibaba-usage file to link.
 Remaining: deploy to ECS · set `.env` on ECS · point WhatsApp webhook at ECS domain · commit `assets/architecture.png` · record 3-min demo → YouTube · submit at portal.
 
 ## Hard Rules
