@@ -242,6 +242,13 @@ h2{font-family:var(--disp);font-weight:700;letter-spacing:-.035em;line-height:1.
 .tc p{font-size:.85rem;color:var(--muted);line-height:1.55;padding:0 1.1rem 1.1rem}
 .tnote{font-family:var(--mono);font-size:.68rem;color:var(--faint);margin-top:.8rem}
 
+/* on-demand thesis pyramid */
+.pyr{display:flex;flex-direction:column;align-items:center;gap:.5rem;margin-top:.4rem}
+.pb{display:flex;align-items:baseline;justify-content:center;gap:.55rem;border-radius:8px;padding:.55rem .7rem;border:1px solid var(--accent-line);min-width:0}
+.pb .pl{font-size:.74rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pb .pv{font-family:var(--disp);font-weight:700;font-size:.88rem;color:var(--accent);white-space:nowrap}
+.pyr-cap{font-family:var(--mono);font-size:.62rem;color:var(--faint);margin-top:.6rem;text-align:center;line-height:1.5}
+
 /* financials */
 .chart{display:flex;align-items:flex-end;justify-content:space-around;gap:1rem;height:clamp(150px,26vh,230px);border-bottom:1px solid var(--line-strong);padding:0 .3rem}
 .cbw{display:flex;flex-direction:column;align-items:center;gap:.5rem;flex:1;height:100%;justify-content:flex-end}
@@ -340,7 +347,7 @@ h2{font-family:var(--disp);font-weight:700;letter-spacing:-.035em;line-height:1.
   <div class="in">
     <div class="eyebrow">The opportunity</div>
     <h2>Everyone says AI hasn't made anyone money. <span class="am">Tukang is the counter-example.</span></h2>
-    <p class="sub">Most AI products are a better search box — you still do the calling, comparing, and deciding. Tukang is an agent that finishes the job: it finds real pros, collects real bids, and completes a real paid booking, with no human on the phone.</p>
+    <p class="sub">Most AI products are a better search box — you still do the calling, comparing, and deciding. Tukang is an agent that finishes the job: real pros, real bids, a real paid booking, no human on the phone. Home services is the beachhead — the same rails extend to all of on-demand.</p>
     <div class="card" style="margin-top:1.2rem;border-color:var(--accent-line);background:var(--accent-soft)">
       <p style="font-family:var(--disp);font-size:1.15rem;font-style:italic;color:var(--text);line-height:1.5;max-width:56ch">"My dad still calls five or six repairmen and can't get a single one to show up. A $5 fee is nothing next to the hours he loses."</p>
       <p class="mono" style="font-size:.7rem;color:var(--muted);margin-top:.6rem;letter-spacing:.04em">— THE PAIN THIS WAS BUILT TO FIX</p>
@@ -402,25 +409,25 @@ h2{font-family:var(--disp);font-weight:700;letter-spacing:-.035em;line-height:1.
 </section>
 
 <!-- 5 MARKET -->
-<section class="slide" data-notes="Funnel is digital-native on purpose: TAM is the full global home-services economy, SAM is the slice that already transacts online end-to-end, SOM is our US beachhead within that online slice. Roofing and plumbing alone are $92.5B + $191.4B industries in the US (IBISWorld 2026) — both still run on pay-per-lead, not booking.">
+<section class="slide" data-notes="TAM/SAM/SOM is scoped to the digitally-addressable market on purpose — not the whole offline industry, which Tukang has no near-term path to capture. TAM is the global online on-demand home-services market (the ceiling for an AI booking agent, period). SAM narrows to the US launch geography. SOM narrows further to the two anchor verticals (roofing + plumbing), estimated as their proportional share of US online spend. The $657B total US industry figure is shown only as context for how much of the market is still offline, not counted as addressable.">
   <div class="in">
     <div class="eyebrow">Market opportunity</div>
     <h2 style="margin-bottom:.4rem">Global market, <span class="am">US beachhead.</span></h2>
     <div class="grid2" style="margin-top:1.2rem">
       <div class="rings">
-        <div class="ring t"><div><div class="rv">$652.7B</div><div class="rk">TAM</div></div></div>
-        <div class="ring s"><div><div class="rv">$14.7B</div><div class="rk">SAM</div></div></div>
-        <div class="ring o"><div><div class="rv">$3.6B</div><div class="rk">SOM</div></div></div>
+        <div class="ring t"><div><div class="rv">$14.7B</div><div class="rk">TAM</div></div></div>
+        <div class="ring s"><div><div class="rv">$3.6B</div><div class="rk">SAM</div></div></div>
+        <div class="ring o"><div><div class="rv">$1.6B</div><div class="rk">SOM</div></div></div>
       </div>
       <div>
         <div class="mklist">
-          <div class="mkli"><span class="sq" style="background:rgba(245,165,36,.55)"></span><span class="ml"><b>US online on-demand</b>, beachhead by 2030</span><span class="mv" data-target="3.6" data-prefix="$" data-suffix="B">$3.6B</span></div>
-          <div class="mkli"><span class="sq" style="background:rgba(245,165,36,.32)"></span><span class="ml"><b>Global online on-demand</b>, by 2030</span><span class="mv">$14.7B</span></div>
-          <div class="mkli"><span class="sq" style="background:rgba(245,165,36,.18)"></span><span class="ml"><b>Global home services</b>, all channels, by 2030</span><span class="mv">$652.7B</span></div>
+          <div class="mkli"><span class="sq" style="background:rgba(245,165,36,.55)"></span><span class="ml"><b>US roofing + plumbing</b>, online-addressable</span><span class="mv" data-target="1.6" data-prefix="$" data-suffix="B">$1.6B</span></div>
+          <div class="mkli"><span class="sq" style="background:rgba(245,165,36,.32)"></span><span class="ml"><b>US online on-demand</b>, beachhead by 2030</span><span class="mv">$3.6B</span></div>
+          <div class="mkli"><span class="sq" style="background:rgba(245,165,36,.18)"></span><span class="ml"><b>Global online on-demand</b>, by 2030</span><span class="mv">$14.7B</span></div>
         </div>
         <div class="cagr">↗ US ≈ 29% of the global online market · 14.3% CAGR to 2030</div>
-        <div class="src">Sources: <a href="https://www.grandviewresearch.com/industry-analysis/online-on-demand-home-services-market-report" target="_blank" rel="noopener">Grand View Research</a> (global &amp; US online on-demand), <a href="https://www.researchandmarkets.com/reports/6170764/home-services-market-report" target="_blank" rel="noopener">Research and Markets, 2026</a> (global total market). Different firms scope "home services" differently — figures aren't directly additive.</div>
-        <div class="anchor-note">Anchor verticals: US <b>roofing</b> ($92.5B) + <b>plumbing</b> ($191.4B) industries alone — both still run on pay-per-lead directories, not bookings. <span class="mono" style="color:var(--faint)">(IBISWorld, 2026)</span></div>
+        <div class="src">Sources: <a href="https://www.grandviewresearch.com/industry-analysis/online-on-demand-home-services-market-report" target="_blank" rel="noopener">Grand View Research</a> (global &amp; US online on-demand). SOM is a Tukang estimate: roofing + plumbing's ~43% share of US home-services spend, applied to the online slice.</div>
+        <div class="anchor-note">For context, not counted above: the <i>entire</i> US home-services industry — including offline, referral-based, and cash jobs — is <b>$657B/yr</b> across 665.6M projects (<a href="https://www.angi.com/research/reports/market/" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">Angi, 2022</a>). Of that, US <b>roofing</b> is a <a href="https://www.ibisworld.com/united-states/industry/roofing-contractors/198/" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">$92.5B industry</a> and <b>plumbing</b> a <a href="https://www.ibisworld.com/united-states/industry/plumbers/1946/" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">$191.4B industry</a> on their own (IBISWorld, 2026) — both still run on pay-per-lead, not booking. Less than 3% of the whole industry transacts online today; that gap is the long-run opportunity, not this deck's TAM.</div>
       </div>
     </div>
   </div>
@@ -521,7 +528,32 @@ h2{font-family:var(--disp);font-weight:700;letter-spacing:-.035em;line-height:1.
   </div>
 </section>
 
-<!-- 10 TEAM -->
+<!-- 10 ON-DEMAND PYRAMID -->
+<section class="slide" data-notes="The founder thesis, extended: a cambrian explosion of MCP connectors replaces an app per service. Home services is the palatable beachhead — fragmented, no dominant platform, worst booking pain, nobody's moat to cross. But the agent rails are service-agnostic: they run upward through every Craigslist category to the on-demand giants themselves. Food delivery and ride-hailing become tool calls inside AI chat — fire-and-forget transactions, no app loyalty to defend. Pyramid sizes are 2030 forecasts (Grand View Research); upper tiers are the thesis map, not this raise's TAM — say that out loud before an investor says it for you.">
+  <div class="in">
+    <div class="eyebrow">The pyramid</div>
+    <h2 style="margin-bottom:.5rem">Home services is the beachhead. <span class="am">The map is all of on-demand.</span></h2>
+    <p class="sub">One conversational agent that finishes transactions — not an app per service. The rails that book a roofer extend to every local service on Craigslist, then to the on-demand giants themselves.</p>
+    <div class="grid2" style="margin-top:1.1rem;align-items:start">
+      <div>
+        <div class="pyr">
+          <div class="pb" style="width:44%;background:rgba(245,165,36,.26)"><span class="pl">US roofing + plumbing</span><span class="pv">$1.6B</span></div>
+          <div class="pb" style="width:62%;background:rgba(245,165,36,.18)"><span class="pl">Online home services · global</span><span class="pv">$14.7B</span></div>
+          <div class="pb" style="width:80%;background:rgba(245,165,36,.11)"><span class="pl">Ride-hailing · global</span><span class="pv">$105B+</span></div>
+          <div class="pb" style="width:100%;background:rgba(245,165,36,.06)"><span class="pl">Online food delivery · global</span><span class="pv">$505B+</span></div>
+        </div>
+        <div class="pyr-cap">2030 forecasts · Grand View Research<br/>upper tiers are the thesis map, not this raise's TAM</div>
+      </div>
+      <div class="gcol">
+        <div class="gi"><span class="gp">now</span><div class="gk">Roofing + plumbing</div><p>Urgent, high-ticket, worst pay-per-lead pain — prove the model where it hurts most, with no incumbent moat to cross.</p></div>
+        <div class="gi"><span class="gp">next</span><div class="gk">Every local service</div><p>HVAC and electrical, then beauty, massage, personal training, pet care, moving, events, tutoring, cleaning — the whole Craigslist map. The agent doesn't know what a "job" is.</p></div>
+        <div class="gi"><span class="gp">later</span><div class="gk">Food delivery &amp; ride-hailing</div><p>DoorDash and Uber become tool calls inside AI chat — fire-and-forget transactions with no app loyalty to defend. Same rails, biggest tiers.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 TEAM -->
 <section class="slide" data-notes="Be direct with investors: this is a solo technical founder, not a team of hires. Claudia and Gemini are AI systems used via API as an engineering and ops force-multiplier, named plainly so it's clear what they are, not human co-founders and not an Anthropic or Google endorsement.">
   <div class="in">
     <div class="eyebrow">Team</div>
@@ -544,7 +576,7 @@ h2{font-family:var(--disp);font-weight:700;letter-spacing:-.035em;line-height:1.
   </div>
 </section>
 
-<!-- 11 FINANCIALS -->
+<!-- 12 FINANCIALS -->
 <section class="slide" data-notes="Illustrative model off modeled unit economics, rebuilt for a higher US average fee. Y1 ~1K intros/mo building US liquidity → ~$0.3M ARR. Y2 ~15K/mo + first subscriptions, multi-category → ~$2.2M. Y3 ~40K/mo across metros + scaled subs → ~$7M. High gross margin compounding on near-zero marginal cost. These are projections, not results — nothing has transacted live yet.">
   <div class="in">
     <div class="eyebrow">Financial projection</div>
@@ -567,7 +599,7 @@ h2{font-family:var(--disp);font-weight:700;letter-spacing:-.035em;line-height:1.
   </div>
 </section>
 
-<!-- 12 ASK -->
+<!-- 13 ASK -->
 <section class="slide" data-notes="$2M seed: 40% supply (contractor onboarding), 25% engineering (SMS/voice outreach, reliability), 25% growth (homeowner acquisition), 10% ops/compliance (licensing, insurance verification). Close: the product is built end-to-end, the round funds the US beachhead and unblocks WhatsApp Business verification in Singapore.">
   <div class="in">
     <div class="eyebrow">The ask</div>
